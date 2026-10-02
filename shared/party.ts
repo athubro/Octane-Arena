@@ -23,6 +23,7 @@ export interface PartyMember {
   preset: Preset;
   team: PartyTeam;
   ready: boolean;
+  connected?: boolean;
 }
 export type MatchPhase =
   | "countdown"
