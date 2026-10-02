@@ -20,12 +20,14 @@ A desktop browser with WebGL 2 and
 a keyboard or standard gamepad is required. Click PLAY to unlock browser audio.
 The game pauses on focus loss. Touch driving is not implemented.
 
-For a same-Wi-Fi party lobby, install the backend dependencies once with
-`npm --prefix server install`, then run **`npm run lan`**. Open
-`http://localhost:8090` on this computer; other computers open the LAN address
-printed in the terminal and join using the party code. This phase synchronizes
-the lobby; multiplayer matches are not implemented yet. See the
-[LAN setup and verified Phase 1 checklist](docs/LAN-PHASE1.md).
+To play a match over the same Wi-Fi, install the backend dependencies once with
+`npm --prefix server install`, then run **`npm run lan`** on the host computer.
+Keep it running, create a party, and share the party code. Other players open
+the LAN address printed in the terminal, join the party, choose the same game
+mode and sides, then the host selects **START MATCH**. The host browser runs the
+authoritative physics; controls and match snapshots are relayed through the LAN
+server to the other players. 1v1, 2v2 and 2v2 Bots are supported. See
+[LAN setup and gameplay details](docs/LAN-PHASE1.md).
 
 The home screen has Play, Garage and Settings on the left, plus a compact clickable Guest/account
 profile. Garage includes two original starter bodies (Ion and Vector), curated

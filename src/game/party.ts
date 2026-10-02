@@ -1,5 +1,7 @@
 import type { Garage } from "./inventory";
 import type { PartyReply, PartyState, PartyActions } from "../../shared/party";
+import type { MatchSnapshot } from "../../shared/party";
+import type { PlayerInput } from "../../shared/player";
 import { loadBackendEndpoints } from "./backend";
 export class PartyClient {
   state: PartyState | null = null;
@@ -12,6 +14,7 @@ export class PartyClient {
   private ready: Promise<void>;
   private token = "";
   private stream: AbortController | null = null;
+  private gameBusy = false;
   connection: "offline" | "connected" = "offline";
   constructor(
     private garage: Garage,
@@ -171,13 +174,39 @@ export class PartyClient {
     try {
       await this.ready;
       if (!this.connected) await this.connect();
-      this.apply(await this.request("/" + action, "POST", data));
+      const path =
+        action === "startMatch"
+          ? "/game/start"
+          : action === "endMatch"
+            ? "/game/end"
+            : "/" + action;
+      this.apply(await this.request(path, "POST", data));
       return true;
     } catch (e) {
       this.message = e instanceof Error ? e.message : "PARTY REQUEST FAILED";
       return false;
     } finally {
       this.busy = false;
+      this.changed();
+    }
+  }
+  async sendGameUpdate(input: PlayerInput, snapshot?: MatchSnapshot) {
+    if (this.gameBusy || !this.connected) return false;
+    this.gameBusy = true;
+    try {
+      await this.ready;
+      this.apply(
+        await this.request("/game/input", "POST", {
+          input,
+          ...(snapshot ? { snapshot } : {}),
+        }),
+      );
+      return true;
+    } catch {
+      this.message = "MATCH CONNECTION LOST — INPUTS NOT SYNCING";
+      return false;
+    } finally {
+      this.gameBusy = false;
       this.changed();
     }
   }

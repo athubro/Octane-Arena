@@ -2,6 +2,7 @@ import { P } from "../config/physics";
 import type { Simulation } from "../physics/simulation";
 import { modes, type Mode } from "./modes";
 import { scoringTeam } from "./goals";
+import type { MatchSnapshot } from "../../shared/party";
 export type Phase =
   | "home"
   | "countdown"
@@ -31,13 +32,14 @@ export class Match {
   }
   start(s: Simulation, mode: Mode = this.mode) {
     this.mode = mode;
+    s.setActiveCount(
+      mode === "party" ? s.configuredCount : this.rules.bot ? 2 : 1,
+    );
     // Explicit collision participation also removes already-registered broadphase pairs.
     this.score = [0, 0];
     this.remaining = 300;
     this.overtime = false;
     this.kickoff(s);
-    s.cars[1].collider.setCollisionGroups(this.rules.bot ? 0xffffffff : 0);
-    s.cars[1].body.setEnabled(this.rules.bot);
   }
   kickoff(s: Simulation) {
     s.reset();
@@ -134,5 +136,25 @@ export class Match {
         : this.score[0] < this.score[1]
           ? "AMBER WINS"
           : "DRAW";
+  }
+  applyNetworkSnapshot(snapshot: MatchSnapshot) {
+    this.mode = "party";
+    this.phase = snapshot.phase;
+    this.score = [...snapshot.score];
+    this.remaining = snapshot.remaining;
+    this.countdown = snapshot.countdown;
+    this.freeze = snapshot.freeze;
+    this.goTime = snapshot.goTime;
+    this.overtime = snapshot.overtime;
+    this.message = snapshot.message;
+    this.resetSequence = snapshot.resetSequence;
+    this.lastGoal = snapshot.lastGoal;
+    this.goalFocus = snapshot.goalFocus
+      ? {
+          x: snapshot.goalFocus[0],
+          y: snapshot.goalFocus[1],
+          z: snapshot.goalFocus[2],
+        }
+      : null;
   }
 }

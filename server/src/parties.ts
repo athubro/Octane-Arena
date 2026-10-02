@@ -15,7 +15,12 @@ import {
   type PartyState,
   type PartyActions,
   type PartyReply,
+  type PartyGame,
+  type MatchSnapshot,
+  type Vec3Tuple,
+  type QuatTuple,
 } from "../../shared/party.js";
+import { neutralInput, type PlayerInput } from "../../shared/player.js";
 import { starter } from "../../shared/catalog.js";
 import type { ServerConfig } from "./config.js";
 type Player = {
@@ -23,6 +28,99 @@ type Player = {
   code: string | null;
   seen: number;
   notice: string;
+};
+const vector = (value: unknown): value is Vec3Tuple =>
+  Array.isArray(value) &&
+  value.length === 3 &&
+  value.every((n) => typeof n === "number" && Number.isFinite(n));
+const quaternion = (value: unknown): value is QuatTuple =>
+  Array.isArray(value) &&
+  value.length === 4 &&
+  value.every((n) => typeof n === "number" && Number.isFinite(n));
+const validSnapshot = (value: unknown): value is MatchSnapshot => {
+  if (!value || typeof value !== "object") return false;
+  const snapshot = value as Partial<MatchSnapshot>;
+  const phases = ["countdown", "playing", "goal", "paused", "finished"];
+  const ball = snapshot.ball;
+  if (
+    !Number.isSafeInteger(snapshot.sequence) ||
+    !phases.includes(snapshot.phase ?? "") ||
+    !Array.isArray(snapshot.score) ||
+    snapshot.score.length !== 2 ||
+    !snapshot.score.every((n) => Number.isFinite(n) && n >= 0) ||
+    ![
+      snapshot.remaining,
+      snapshot.countdown,
+      snapshot.freeze,
+      snapshot.goTime,
+      snapshot.clock,
+    ].every((n) => typeof n === "number" && Number.isFinite(n)) ||
+    !Number.isSafeInteger(snapshot.resetSequence) ||
+    typeof snapshot.overtime !== "boolean" ||
+    typeof snapshot.message !== "string" ||
+    snapshot.message.length > 160 ||
+    !(
+      snapshot.lastTouchId === null || typeof snapshot.lastTouchId === "string"
+    ) ||
+    !(
+      snapshot.lastGoal === null ||
+      (typeof snapshot.lastGoal === "object" &&
+        typeof snapshot.lastGoal.scorerId === "string" &&
+        snapshot.lastGoal.scorerId.length <= 100 &&
+        (snapshot.lastGoal.team === 0 || snapshot.lastGoal.team === 1) &&
+        typeof snapshot.lastGoal.ownGoal === "boolean")
+    ) ||
+    !(snapshot.goalFocus === null || vector(snapshot.goalFocus)) ||
+    !ball ||
+    !vector(ball.position) ||
+    !quaternion(ball.rotation) ||
+    !vector(ball.velocity) ||
+    !vector(ball.angularVelocity) ||
+    typeof ball.enabled !== "boolean" ||
+    !Array.isArray(snapshot.cars) ||
+    snapshot.cars.length < 1 ||
+    snapshot.cars.length > 4 ||
+    !Array.isArray(snapshot.pads) ||
+    snapshot.pads.length > 30 ||
+    !snapshot.pads.every((n) => typeof n === "number" && Number.isFinite(n))
+  )
+    return false;
+  return snapshot.cars.every(
+    (car) =>
+      car !== null &&
+      typeof car === "object" &&
+      typeof car.id === "string" &&
+      car.id.length > 0 &&
+      car.id.length <= 100 &&
+      vector(car.position) &&
+      quaternion(car.rotation) &&
+      vector(car.velocity) &&
+      vector(car.angularVelocity) &&
+      typeof car.enabled === "boolean" &&
+      typeof car.boost === "number" &&
+      Number.isFinite(car.boost) &&
+      car.boost >= 0 &&
+      car.boost <= 100 &&
+      typeof car.boosting === "boolean" &&
+      ["active", "demolished", "respawning"].includes(car.demolitionState) &&
+      typeof car.respawnTimer === "number" &&
+      Number.isFinite(car.respawnTimer) &&
+      typeof car.supersonic === "boolean" &&
+      typeof car.forwardSpeed === "number" &&
+      Number.isFinite(car.forwardSpeed) &&
+      typeof car.steerAngle === "number" &&
+      Number.isFinite(car.steerAngle) &&
+      typeof car.grounded === "boolean" &&
+      Array.isArray(car.wheelOrigins) &&
+      car.wheelOrigins.length === 4 &&
+      car.wheelOrigins.every(vector) &&
+      Array.isArray(car.wheelHits) &&
+      car.wheelHits.length === 4 &&
+      car.wheelHits.every(vector) &&
+      Array.isArray(car.wheelContact) &&
+      car.wheelContact.length === 4 &&
+      car.wheelContact.every((contact) => typeof contact === "boolean"),
+  );
 };
 export function registerParties(
   app: FastifyInstance,
@@ -48,9 +146,12 @@ export function registerParties(
     p.member.ready = false;
     p.member.team = null;
     if (!party) return;
+    if (party.game?.status === "playing") party.game.status = "finished";
     party.members = party.members.filter((m) => m.id !== p.member.id);
-    if (!party.members.length) parties.delete(party.code);
-    else if (party.hostId === p.member.id) party.hostId = party.members[0].id;
+    if (!party.members.length) {
+      parties.delete(party.code);
+      inputSeen.delete(party.code);
+    } else if (party.hostId === p.member.id) party.hostId = party.members[0].id;
   };
   const prune = () => {
     for (const [token, p] of players)
@@ -91,11 +192,26 @@ export function registerParties(
       preset: parsed.data,
     });
   };
-  const state = (p: Player): PartyReply => ({
-    playerId: p.member.id,
-    party: p.code ? (parties.get(p.code) ?? null) : null,
-    notice: p.notice,
-  });
+  const inputSeen = new Map<string, Map<string, number>>();
+  const state = (p: Player): PartyReply => {
+    const party = p.code ? (parties.get(p.code) ?? null) : null;
+    if (party?.game) {
+      const seen = inputSeen.get(party.code);
+      party.game.inputs = Object.fromEntries(
+        party.game.players.map(({ id }) => [
+          id,
+          seen && Date.now() - (seen.get(id) ?? 0) < 300
+            ? (party.game!.inputs[id] ?? neutralInput())
+            : neutralInput(),
+        ]),
+      );
+    }
+    return {
+      playerId: p.member.id,
+      party,
+      notice: p.notice,
+    };
+  };
   app.post(
     "/api/party/session",
     { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
@@ -200,6 +316,7 @@ export function registerParties(
       members: [p.member],
       mode: "1v1",
       stage: "home",
+      game: null,
     });
     return state(p);
   });
@@ -212,6 +329,7 @@ export function registerParties(
     if (!validPartyCode(code)) return fail(400, "INVALID CODE");
     const party = parties.get(code);
     if (!party) return fail(404, "PARTY NOT FOUND");
+    if (party.game?.status === "playing") return fail(409, "MATCH IN PROGRESS");
     if (p.code === code) return state(p);
     if (party.members.length >= 4) return fail(409, "PARTY FULL");
     if (
@@ -265,6 +383,7 @@ export function registerParties(
       party = p.code ? parties.get(p.code) : null,
       team = (req.body as PartyActions["team"])?.team;
     if (!party) return fail(409, "JOIN A PARTY FIRST");
+    if (party.game?.status === "playing") return fail(409, "MATCH IN PROGRESS");
     if (team !== null && team !== 0 && team !== 1)
       return fail(400, "INVALID TEAM");
     if (
@@ -293,6 +412,7 @@ export function registerParties(
       mode = (req.body as PartyActions["mode"])?.mode;
     if (!party || party.hostId !== p.member.id)
       return fail(403, "ONLY THE HOST CAN CHANGE MODE");
+    if (party.game?.status === "playing") return fail(409, "MATCH IN PROGRESS");
     if (!partyModes.some((m) => m.id === mode))
       return fail(400, "INVALID MODE");
     if (party.stage === "teams")
@@ -311,6 +431,7 @@ export function registerParties(
       party = p.code ? parties.get(p.code) : null;
     if (!party || party.hostId !== p.member.id)
       return fail(403, "ONLY THE HOST CAN CONTINUE");
+    if (party.game?.status === "playing") return fail(409, "MATCH IN PROGRESS");
     const stage = (req.body as PartyActions["stage"])?.stage;
     if (stage !== "home" && stage !== "mode" && stage !== "teams")
       return fail(400, "INVALID LOBBY STAGE");
@@ -324,6 +445,107 @@ export function registerParties(
         m.ready = false;
       }
     party.stage = stage;
+    return state(p);
+  });
+  app.post("/api/party/game/start", async (req) => {
+    const p = get(req),
+      party = p.code ? parties.get(p.code) : null;
+    if (!party || party.hostId !== p.member.id)
+      return fail(403, "ONLY THE HOST CAN START THE MATCH");
+    if (party.stage !== "teams") return fail(409, "CHOOSE TEAMS FIRST");
+    if (party.game?.status === "playing")
+      return fail(409, "MATCH ALREADY IN PROGRESS");
+    const members = party.members,
+      assigned = members.every((m) => m.team !== null),
+      blue = members.filter((m) => m.team === 0).length,
+      orange = members.filter((m) => m.team === 1).length;
+    if (
+      !assigned ||
+      (party.mode === "1v1" &&
+        (members.length !== 2 || blue !== 1 || orange !== 1)) ||
+      (party.mode === "2v2" && (members.length < 2 || !blue || !orange)) ||
+      (party.mode === "2v2bots" && (!blue || orange))
+    )
+      return fail(409, "FILL BOTH SIDES BEFORE STARTING");
+    const players: PartyGame["players"] = members.map((m) => ({
+      id: m.id,
+      name: m.name,
+      preset: m.preset,
+      team: m.team!,
+    }));
+    party.game = {
+      id: randomUUID(),
+      mode: party.mode,
+      status: "playing",
+      startedAt: Date.now() + 750,
+      players,
+      inputs: Object.fromEntries(players.map(({ id }) => [id, neutralInput()])),
+      snapshot: null,
+    };
+    inputSeen.set(
+      party.code,
+      new Map(players.map(({ id }) => [id, Date.now()])),
+    );
+    return state(p);
+  });
+  app.post(
+    "/api/party/game/input",
+    { config: { rateLimit: { max: 6000, timeWindow: "1 minute" } } },
+    async (req) => {
+      const p = get(req),
+        party = p.code ? parties.get(p.code) : null,
+        game = party?.game,
+        body = req.body as { input?: unknown; snapshot?: unknown };
+      if (!party || !game || game.status !== "playing")
+        return fail(409, "NO ACTIVE MATCH");
+      const player = game.players.find((member) => member.id === p.member.id);
+      if (!player) return fail(403, "NOT A MATCH PARTICIPANT");
+      const raw = body?.input;
+      if (
+        !raw ||
+        typeof raw !== "object" ||
+        !["throttle", "steer", "pitch", "yaw", "roll"].every(
+          (key) =>
+            typeof (raw as Record<string, unknown>)[key] === "number" &&
+            Number.isFinite((raw as Record<string, number>)[key]) &&
+            Math.abs((raw as Record<string, number>)[key]) <= 1,
+        ) ||
+        !["jump", "boost", "slide"].every(
+          (key) => typeof (raw as Record<string, unknown>)[key] === "boolean",
+        ) ||
+        ["dodgeX", "dodgeY"].some(
+          (key) =>
+            (raw as Record<string, unknown>)[key] !== undefined &&
+            (typeof (raw as Record<string, unknown>)[key] !== "number" ||
+              !Number.isFinite((raw as Record<string, number>)[key]) ||
+              Math.abs((raw as Record<string, number>)[key]) > 1),
+        )
+      )
+        return fail(400, "INVALID MATCH INPUT");
+      game.inputs[p.member.id] = raw as PlayerInput;
+      inputSeen.get(party.code)?.set(p.member.id, Date.now());
+      if (body.snapshot !== undefined) {
+        if (p.member.id !== party.hostId)
+          return fail(403, "ONLY THE HOST CAN PUBLISH MATCH STATE");
+        const snapshot = body.snapshot;
+        if (
+          !validSnapshot(snapshot) ||
+          Buffer.byteLength(JSON.stringify(snapshot)) > 24000
+        )
+          return fail(400, "INVALID MATCH SNAPSHOT");
+        if (!game.snapshot || snapshot.sequence > game.snapshot.sequence)
+          game.snapshot = snapshot;
+        if (snapshot.phase === "finished") game.status = "finished";
+      }
+      return state(p);
+    },
+  );
+  app.post("/api/party/game/end", async (req) => {
+    const p = get(req),
+      party = p.code ? parties.get(p.code) : null;
+    if (!party || party.hostId !== p.member.id)
+      return fail(403, "ONLY THE HOST CAN END THE MATCH");
+    if (party.game) party.game.status = "finished";
     return state(p);
   });
   app.post("/api/party/disconnect", async (req) => {

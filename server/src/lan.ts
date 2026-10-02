@@ -79,7 +79,7 @@ if (
 ) {
   const { app, addresses, port } = await startLan();
   console.log(
-    `Octane Arena LAN ready on 0.0.0.0:${port}\nThis computer: http://localhost:${port}\nSame Wi-Fi: ${addresses.map((ip) => `http://${ip}:${port}`).join(" or ") || "No LAN IPv4 address detected"}\nOpen the same address on another device, then Create Party / Join Party. Lobby only; network matches arrive in Phase 2.`,
+    `Octane Arena LAN ready on 0.0.0.0:${port}\nThis computer: http://localhost:${port}\nSame Wi-Fi: ${addresses.map((ip) => `http://${ip}:${port}`).join(" or ") || "No LAN IPv4 address detected"}\nOpen the same address on every device, create or join a party, choose teams and have the host start the match.`,
   );
   for (const signal of ["SIGINT", "SIGTERM"] as const)
     process.on(signal, () => void app.close().then(() => process.exit(0)));

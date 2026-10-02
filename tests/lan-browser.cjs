@@ -79,6 +79,52 @@ const os = require("node:os");
     );
     await host.locator('[data-stage="mode"]').click();
     await host.locator('[data-stage="home"]').click();
+    await host.locator("#party-start").click();
+    await host.locator('[data-mode="1v1"]').click();
+    await host.locator("#party-continue").click();
+    await host.locator('.party-team-join[data-team="0"]').click();
+    await guest.locator('.party-team-join[data-team="1"]').click();
+    await host.locator("#party-match-start").click();
+    await host.waitForFunction(
+      () =>
+        window.__arena.match.mode === "party" &&
+        window.__arena.match.phase === "countdown",
+    );
+    await host.waitForFunction(
+      () => window.__arena.match.phase === "playing",
+      {},
+      { timeout: 8000 },
+    );
+    const hostPlayerId = await host.evaluate(
+      () => window.__arena.party.playerId,
+    );
+    const initialHostCarZ = await guest.evaluate(
+      (id) =>
+        window.__arena.simulation.cars
+          .find((car) => car.id === id)
+          .body.translation().z,
+      hostPlayerId,
+    );
+    await host.keyboard.down("KeyW");
+    await guest.keyboard.down("KeyW");
+    await host.waitForTimeout(700);
+    await host.keyboard.up("KeyW");
+    await guest.keyboard.up("KeyW");
+    await guest.waitForFunction(
+      ({ id, z }) => {
+        const car = window.__arena.simulation.cars.find(
+          (item) => item.id === id,
+        );
+        return car?.forwardSpeed > 0 && car.body.translation().z < z - 0.5;
+      },
+      { id: hostPlayerId, z: initialHostCarZ },
+    );
+    await host.keyboard.press("Escape");
+    await host.locator("#pause-home").click();
+    await guest.waitForFunction(
+      () => window.__arena.match.phase === "finished",
+    );
+    console.log("PASS host-authoritative LAN match input and state sync");
     console.log("PASS mode flow and team state synchronize");
     for (let i = 2; i < 4; i++) {
       const p = await open();

@@ -58,6 +58,16 @@ Production cookies are `__Host-oa_session; Secure; HttpOnly; SameSite=None; Part
 
 ## Data and API
 
+### Same-Wi-Fi matches
+
+`npm run lan` builds the frontend and starts the combined party service on
+`0.0.0.0:8090`. Parties choose a mode and teams, then the host starts the match.
+The host browser is authoritative for physics and scoring; clients submit
+validated ID-associated controls at 20Hz, and the party event stream distributes
+host snapshots for rendering. LAN match state is in memory, so the host server
+must stay running. This is a small trusted-LAN feature, not a dedicated or
+anti-cheat-protected public game server.
+
 SQLite runs in WAL mode with foreign keys and a busy timeout. Schema version 1 is explicit; unknown versions refuse startup. Tables separate accounts, profiles, owned items, presets, per-field preferences, ratings and sessions. Usernames preserve display case but uniqueness/login use lowercase ASCII; identities are independent UUIDs. New accounts have two original bodies, starter cosmetics/titles, 0 XP, level 1, and unrated 1v1/2v2/3v3 rows. Existing Guest presets remain separate on their device.
 
 | Endpoint                  | Purpose                                                        |
@@ -85,6 +95,6 @@ To restore, stop the service, keep the existing database **and its matching `-wa
 
 ## Security and future networking
 
-See [security review](../docs/ACCOUNT-SECURITY.md) and [verification](../docs/MAJOR-UPDATE.md). Future friends/party membership should reference account UUIDs. Add a separate WebSocket gateway that validates the session cookie and Origin during upgrade, enforces expiry/revocation for live connections and attaches the authenticated account ID. `createApp().authenticated()` supplies session lookup, but **does not replace** WebSocket Origin, rate, expiry or permission checks.
+See [security review](../docs/ACCOUNT-SECURITY.md) and [verification](../docs/MAJOR-UPDATE.md). LAN party identity currently uses a random per-tab token and party membership; it is deliberately separate from persistent account identity. The host browser, not this service, simulates LAN matches. Do not expose this trusted-LAN match relay as a public game server.
 
-Future game servers should accept sequenced inputs, simulate authoritative matches, and write validated match results through internal transactions. Clients must never dictate positions, score, inventory, XP or ratings. REST remains for durable account data. Add migrations for friends/parties/matches; do not overload usernames, settings blobs or the existing save endpoint. For multiple API workers, replace in-memory rate counters with a shared limiter; current SQLite deployment targets a small single-node service with persistent disk.
+Public multiplayer should use a dedicated authoritative simulation service that accepts sequenced inputs and writes validated match results through internal transactions. Clients must never dictate positions, score, inventory, XP or ratings. REST remains for durable account data. Add migrations for friends/parties/matches; do not overload usernames, settings blobs or the existing save endpoint. For multiple API workers, replace in-memory party/rate state with shared storage and a shared limiter; current deployment targets a small single-node service.

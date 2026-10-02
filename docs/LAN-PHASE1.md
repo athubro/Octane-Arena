@@ -1,4 +1,12 @@
-# LAN Phase 1: lobby foundation
+# LAN matches: setup and verification
+
+Parties now continue into playable same-Wi-Fi matches. Start the host with
+`npm run lan`, open the printed host address on every device, create/join a
+party, choose a mode and assign teams. The host starts the match from the team
+screen. The host browser runs the fixed-tick simulation; player controls travel
+to it through the LAN service, which publishes authoritative car, ball, clock,
+score and boost-pad snapshots to all clients. Keep the host browser and LAN
+server running for the full match.
 
 ## Continuation verification — September 30, 2026
 
@@ -21,7 +29,7 @@ and bound to `0.0.0.0:8090`, printing `http://172.20.10.2:8090` for this network
 | 9. Four-player representation and ID-based scoring | COMPLETE | COMPLETE |
 | 10. Leave/disconnect/reconnect | PARTIALLY COMPLETE final event-channel regression verification | COMPLETE |
 | 11. npm run lan | COMPLETE | COMPLETE |
-| 12. Future authority boundary, no synchronized physics | COMPLETE | COMPLETE |
+| 12. Future authority boundary, no synchronized physics | COMPLETE | Host-authoritative LAN matches |
 
 No Phase 1 feature was missing. One browser test still addressed the removed
 mode dropdown: corrected it to use Start Game and the mode cards. Added a
@@ -56,7 +64,8 @@ Logs: `.tools/lan-continuation-physics.log`, `.tools/lan-continuation-server.log
 
 The LAN tests used multiple browser clients on this computer through its LAN
 address. A second physical computer's Wi-Fi/firewall path is still unverified.
-Network simulation and other excluded Phase 2 features remain NOT STARTED by design.
+Public matchmaking, ranked play, prediction/reconciliation and server-side
+anti-cheat remain out of scope.
 
 ## Updated party setup flow
 
@@ -69,16 +78,15 @@ Players choose Blue or Orange there. The server enforces one player per side in
 clears previous assignments so each player can choose. Two-player modes reject
 parties larger than two rather than silently dropping members.
 
-For **2 vs 2 Bots**, two human slots are on Blue and two reserved bot slots are on
-Orange. This is pre-game setup only: synchronized human/bot matches still require
-Phase 2. The host can change mode or return everyone home; guests can leave.
+For **2 vs 2 Bots**, up to two humans play Blue against two local host-controlled
+bots on Orange. The host can change mode or return everyone home; guests can
+leave.
 Host departure transfers setup control to the next remaining member.
 
-Server-sent events now deliver changed lobby snapshots at up to 100ms intervals.
-The existing two-second poll remains for reconnection, presence and fallback.
-Outgoing stream traffic does not renew presence, so broken connections still
-expire. No physics messages were added. The original audit below describes the
-prior Phase 1 completion; its Ready control has since been replaced by this flow.
+Server-sent events deliver changed party and game snapshots at up to 100ms
+intervals. Clients submit input at 20Hz; only the host publishes match state.
+The existing two-second poll remains for reconnection and presence. Stale input
+is neutralized, and a host departure ends the shared match.
 
 The checklist below follows the twelve requirements in the continuation request.
 The separate original LAN attachment was not available; the accessible earlier
@@ -99,7 +107,7 @@ attachment covered the home screen and parties.
 | Four cars without player/bot assumptions | BROKEN / NEEDS CORRECTION: collision bookkeeping assumed first two cars | COMPLETE: four rendered lobby cars and four independent physics entities; collisions between third/fourth cars and ID-based scoring tested. |
 | Connection / disconnection | BROKEN / NEEDS CORRECTION: shared-cookie identity across tabs; incomplete cleanup | COMPLETE: tab-specific identity, explicit leave/disconnect, page-close removal, host transfer, offline/reconnect and stale-session cleanup. |
 | Simple LAN launch | NOT STARTED | COMPLETE: npm run lan builds and starts the combined service; command executed successfully. |
-| Preserve future authority boundary without network physics | PARTIALLY COMPLETE | COMPLETE for Phase 1: shared inputs/IDs and server-owned lobby state; gameplay remains local. |
+| Keep one authoritative simulation and synchronize match play | NOT STARTED | COMPLETE: host physics, ID-addressed player input, validated state snapshots and synchronized match rules. |
 
 ## Start and join
 
@@ -215,13 +223,14 @@ by browser smoke and the simulation suite.
   leave/page close sends an immediate disconnect request.
 - Parties are in memory and disappear on server restart. Reloading a page leaves
   its party; this phase does not implement persistent/rejoinable match sessions.
-- Four players can share the lobby, but Free Play and VS Bot still run locally.
-  Team selection does not launch a network match.
+- Match authority lives in the host browser, not the server. If the host closes
+  the browser or loses Wi-Fi, the match ends. The service forwards inputs and
+  validates snapshot shape but does not simulate physics or prevent a modified
+  host client from cheating.
+- Physics snapshots are relayed at roughly 10Hz and remote cars are interpolated
+  between them. No client prediction, rollback or lag compensation is provided;
+  test on the target Wi-Fi and keep latency low.
 - The production bundle retains Vite's large-chunk advisory; builds succeed.
 
-Phase 2 should connect lobby rosters to a server-owned match lifecycle and a
-fixed-tick simulation, with sequenced player inputs and state snapshots. Remote
-car/ball rendering and interpolation should follow, with latency testing before
-prediction/reconciliation. None of that network physics is implemented here.
-Matchmaking, ranked queues, public hosting, anti-cheat and voice chat remain out
-of scope.
+Public matchmaking, ranked queues, public hosting, authoritative dedicated
+servers, anti-cheat and voice chat remain out of scope.

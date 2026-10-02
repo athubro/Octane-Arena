@@ -42,15 +42,28 @@ import { GoalPlanes } from "./effects/goal-plane";
 import { BallTrails, FlipTrails } from "./effects/motion-trails";
 import { PadRecharge } from "./render/pad-recharge";
 import { DemolitionFlash } from "./effects/demolition-flash";
+import type {
+  MatchSnapshot,
+  PartyGame,
+  Vec3Tuple,
+  QuatTuple,
+} from "../shared/party";
+import type { PlayerEntity, PlayerInput } from "../shared/player";
 
 async function boot() {
   await RAPIER.init();
   const settings = new Settings(),
     garage = new Garage(),
     ui = new UI(),
-    simulation = new Simulation(),
+    simulation = new Simulation(false, [
+      { id: "player", name: "Guest", team: 0, controller: "local" },
+      { id: "bot", name: "Rival", team: 1, controller: "bot" },
+      { id: "reserve-blue", name: "Guest", team: 0, controller: "remote" },
+      { id: "reserve-orange", name: "Guest", team: 1, controller: "remote" },
+    ]),
     input = new Input(settings.value.bindings),
     opponent = new Opponent(),
+    botBrains = simulation.cars.map(() => new Opponent()),
     match = new Match(),
     pads = new Pads(),
     audio = new GameAudio();
@@ -92,6 +105,8 @@ async function boot() {
       garage.current.wheels,
       garage.current.decal,
     ),
+    carModel(0xfa9c3e, "vector"),
+    carModel(0x69e9ff),
     carModel(0xfa9c3e, "vector"),
   ];
   const cars = visuals.map((model) => {
@@ -150,6 +165,23 @@ async function boot() {
   const vehicleEffects = cars.map(
     (car, i) => new VehicleEffects(car, scene, i === 0 ? 0x69e9ff : 0xffb654),
   );
+  const replaceCarVisual = (
+    i: number,
+    preset: PartyGame["players"][number]["preset"],
+    color: string,
+  ) => {
+    cars[i].remove(visuals[i]);
+    disposeModel(visuals[i]);
+    visuals[i] = carModel(
+      new T.Color(color).getHex(),
+      preset.body,
+      preset.wheels,
+      preset.decal,
+    );
+    cars[i].add(visuals[i]);
+    simulation.cars[i].setBody(preset.body);
+    vehicleEffects[i].setColor(preset.boost === "ember" ? 0xffa548 : 0x69e9ff);
+  };
   const explosion = new GoalExplosion(scene);
   const graphics = new Graphics(renderer, scene, camera, sun),
     hitboxes = new Hitboxes(scene);
@@ -200,6 +232,12 @@ async function boot() {
   const party = new PartyClient(garage),
     partyPanel = new PartyPanel(party),
     homeLobby = new HomeLobby(scene);
+  let activePartyGameId: string | null = null,
+    dismissedPartyGameId: string | null = null,
+    lastRemoteSnapshot = -1,
+    lastRemoteSnapshotAt = 0,
+    networkSequence = 0,
+    lastNetworkSend = 0;
   const leaveDialog = document.createElement("dialog");
   leaveDialog.id = "leave-confirm";
   leaveDialog.setAttribute("aria-labelledby", "leave-title");
@@ -219,16 +257,26 @@ async function boot() {
   leaveDialog.querySelector<HTMLButtonElement>("#leave-confirm-stay")!.onclick =
     stay;
   const loop = new FixedLoop();
-  const start = (mode: "bot" | "freeplay" = match.mode) => {
+  const start = (
+    mode: "bot" | "freeplay" = match.mode === "freeplay" ? "freeplay" : "bot",
+  ) => {
     ui.modes(false);
     resetEffects();
     audio.unlock();
     input.clear();
     updatePreset();
     opponent.rename();
-    simulation.cars[0].displayName = garage.profile.name;
-    simulation.cars[1].displayName = opponent.name;
+    simulation.configurePlayers([
+      {
+        id: "player",
+        name: garage.profile.name,
+        team: 0,
+        controller: "local",
+      },
+      { id: "bot", name: opponent.name, team: 1, controller: "bot" },
+    ]);
     document.getElementById("bot-tag")!.textContent = opponent.name;
+    activePartyGameId = null;
     match.start(simulation, mode);
     arena.setNeutral(match.rules.training);
     goalPlanes.setNeutral(match.rules.training);
@@ -237,7 +285,66 @@ async function boot() {
     cameraControl.reset();
     audio.tone(420, 0.12, 0.08, "sine");
   };
+  const startParty = (game: PartyGame) => {
+    const local = game.players.find((player) => player.id === party.playerId);
+    if (!local) {
+      party.message = "YOU ARE NOT A PARTICIPANT IN THIS MATCH";
+      return;
+    }
+    const members = [
+      local,
+      ...game.players.filter((player) => player.id !== local.id),
+    ];
+    const roster: PlayerEntity[] = members.map((player) => ({
+      id: player.id,
+      name: player.name,
+      team: player.team,
+      controller: player.id === party.playerId ? "local" : "remote",
+    }));
+    if (game.mode === "2v2bots")
+      roster.push(
+        { id: "bot-circuit", name: "CIRCUIT", team: 1, controller: "bot" },
+        { id: "bot-relay", name: "RELAY", team: 1, controller: "bot" },
+      );
+    simulation.configurePlayers(roster);
+    updatePreset();
+    members.forEach((player, i) =>
+      replaceCarVisual(
+        i,
+        player.preset,
+        player.team === 0 ? player.preset.blue : "#fa9c3e",
+      ),
+    );
+    if (game.mode === "2v2bots") {
+      replaceCarVisual(roster.length - 2, garage.current, "#fa9c3e");
+      replaceCarVisual(roster.length - 1, garage.current, "#ffb654");
+    }
+    activePartyGameId = game.id;
+    dismissedPartyGameId = null;
+    lastRemoteSnapshot = -1;
+    lastRemoteSnapshotAt = 0;
+    networkSequence = 0;
+    input.clear();
+    resetEffects();
+    ui.modes(false);
+    match.start(simulation, "party");
+    arena.setNeutral(false);
+    goalPlanes.setNeutral(false);
+    pads.reset();
+    loop.accumulator = 0;
+    cameraControl.reset();
+    audio.tone(420, 0.12, 0.08, "sine");
+  };
   const home = () => {
+    const game = party.state?.game;
+    if (
+      match.mode === "party" &&
+      game?.status === "playing" &&
+      party.state?.hostId === party.playerId
+    )
+      void party.action("endMatch");
+    if (activePartyGameId) dismissedPartyGameId = activePartyGameId;
+    activePartyGameId = null;
     leaveDialog.close();
     ui.leaveConfirmation = false;
     ui.modes(false);
@@ -263,8 +370,17 @@ async function boot() {
     input.clear();
   });
   ui.on("modes-back", () => ui.modes(false));
-  ui.on("again", () => start());
-  ui.on("resume", () => match.pause());
+  ui.on("again", () => {
+    if (match.mode !== "party") {
+      start();
+      return;
+    }
+    if (party.state?.hostId === party.playerId) void party.action("startMatch");
+  });
+  ui.on("resume", () => {
+    if (match.mode !== "party" || party.state?.hostId === party.playerId)
+      match.pause();
+  });
   ui.on("home", home);
   leaveDialog.querySelector<HTMLButtonElement>("#leave-confirm-yes")!.onclick =
     home;
@@ -300,10 +416,19 @@ async function boot() {
     }
   });
   window.addEventListener("blur", () => {
-    if (match.active) match.pause();
+    if (
+      match.active &&
+      (match.mode !== "party" || party.state?.hostId === party.playerId)
+    )
+      match.pause();
   });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && match.active) match.pause();
+    if (
+      document.hidden &&
+      match.active &&
+      (match.mode !== "party" || party.state?.hostId === party.playerId)
+    )
+      match.pause();
   });
   window.addEventListener("resize", () => {
     graphics.resize();
@@ -316,14 +441,138 @@ async function boot() {
     tickCount = 0,
     statsTime = 0,
     ticksPerSecond = 0;
+  const vectorTuple = (v: { x: number; y: number; z: number }): Vec3Tuple => [
+      v.x,
+      v.y,
+      v.z,
+    ],
+    quaternionTuple = (q: {
+      x: number;
+      y: number;
+      z: number;
+      w: number;
+    }): QuatTuple => [q.x, q.y, q.z, q.w],
+    makeNetworkSnapshot = (): MatchSnapshot => ({
+      sequence: ++networkSequence,
+      phase: match.phase === "home" ? "finished" : match.phase,
+      score: [match.score[0], match.score[1]],
+      remaining: match.remaining,
+      countdown: match.countdown,
+      freeze: match.freeze,
+      goTime: match.goTime,
+      overtime: match.overtime,
+      message: match.message,
+      resetSequence: match.resetSequence,
+      lastGoal: match.lastGoal,
+      goalFocus: match.goalFocus
+        ? [match.goalFocus.x, match.goalFocus.y, match.goalFocus.z]
+        : null,
+      clock: simulation.clock,
+      lastTouchId: simulation.lastTouchId,
+      ball: {
+        position: vectorTuple(simulation.ball.translation()),
+        rotation: quaternionTuple(simulation.ball.rotation()),
+        velocity: vectorTuple(simulation.ball.linvel()),
+        angularVelocity: vectorTuple(simulation.ball.angvel()),
+        enabled: simulation.ball.isEnabled(),
+      },
+      cars: simulation.cars
+        .filter((car) => car.active)
+        .map((car) => ({
+          id: car.id,
+          position: vectorTuple(car.body.translation()),
+          rotation: quaternionTuple(car.body.rotation()),
+          velocity: vectorTuple(car.body.linvel()),
+          angularVelocity: vectorTuple(car.body.angvel()),
+          enabled: car.body.isEnabled(),
+          boost: car.boost,
+          boosting: car.boosting,
+          demolitionState: car.demolitionState,
+          respawnTimer: car.respawnTimer,
+          supersonic: car.supersonic,
+          forwardSpeed: car.forwardSpeed,
+          steerAngle: car.steerAngle,
+          grounded: car.grounded,
+          wheelOrigins: car.wheelOrigins.map(vectorTuple),
+          wheelHits: car.wheelHits.map(vectorTuple),
+          wheelContact: [...car.wheelContact],
+        })),
+      pads: pads.items.map((pad) => pad.cooldown),
+    });
   function frame(now: number) {
     const dt = Math.min((now - previous) / 1000, 0.1);
     previous = now;
     const controls = input.sample();
+    const networkGame = party.state?.game ?? null;
+    const partyInputs = () => {
+      const inputs = new Map<string, PlayerInput>();
+      for (const [i, car] of simulation.cars.entries()) {
+        if (!car.active) continue;
+        inputs.set(
+          car.id,
+          car.controller === "local"
+            ? controls
+            : car.controller === "bot"
+              ? botBrains[i].sample(
+                  car,
+                  simulation.ball.translation(),
+                  simulation.clock,
+                )
+              : (networkGame?.inputs[car.id] ?? neutral()),
+        );
+      }
+      return inputs;
+    };
+    if (
+      networkGame?.status === "playing" &&
+      Date.now() >= networkGame.startedAt &&
+      networkGame.id !== activePartyGameId &&
+      networkGame.id !== dismissedPartyGameId
+    )
+      startParty(networkGame);
+    if (
+      activePartyGameId &&
+      networkGame?.id === activePartyGameId &&
+      party.state?.hostId !== party.playerId &&
+      networkGame.snapshot &&
+      networkGame.snapshot.sequence > lastRemoteSnapshot
+    ) {
+      const previousPhase = match.phase,
+        previousReset = match.resetSequence;
+      simulation.applyNetworkSnapshot(networkGame.snapshot);
+      match.applyNetworkSnapshot(networkGame.snapshot);
+      if (previousReset !== match.resetSequence) {
+        resetEffects();
+        cameraControl.reset();
+      }
+      if (previousPhase === "playing" && match.phase === "goal") {
+        const origin = new T.Vector3().copy(simulation.ball.translation()),
+          color = origin.z < 0 ? 0x69e9ff : 0xffb654;
+        explosion.trigger(origin, color);
+        effects.burst(origin, color);
+        vehicleEffects.forEach((e) => e.reset());
+      }
+      networkGame.snapshot.pads.forEach((cooldown, i) => {
+        if (pads.items[i]) pads.items[i].cooldown = cooldown;
+      });
+      lastRemoteSnapshot = networkGame.snapshot.sequence;
+      lastRemoteSnapshotAt = now;
+    }
+    if (
+      activePartyGameId &&
+      networkGame?.id === activePartyGameId &&
+      networkGame.status === "finished" &&
+      match.phase !== "finished"
+    )
+      match.finish();
     if (input.takeAction("camera"))
       cameraControl.ballMode = !cameraControl.ballMode;
     if (input.takeAction("debug")) debug.enabled = !debug.enabled;
-    if (input.takeAction("pause") && !document.querySelector("dialog[open]")) {
+    if (
+      input.takeAction("pause") &&
+      !document.querySelector("dialog[open]") &&
+      (match.mode !== "party" || party.state?.hostId === party.playerId)
+    ) {
       if (match.phase === "home") {
         if (partyPanel.escape()) {
           input.clear();
@@ -346,24 +595,39 @@ async function boot() {
           loop.accumulator = 0;
         }
       }
+    const remoteParty =
+      match.mode === "party" &&
+      activePartyGameId !== null &&
+      networkGame?.id === activePartyGameId &&
+      party.state?.hostId !== party.playerId;
     let alpha = 1;
-    if (match.active) {
+    if (remoteParty) {
+      loop.accumulator = 0;
+      alpha =
+        lastRemoteSnapshotAt > 0
+          ? Math.min(1, Math.max(0, (now - lastRemoteSnapshotAt) / 100))
+          : 1;
+    } else if (match.active) {
       const result = loop.advance(dt, () => {
         const phase = match.phase;
         const resetSequence = match.resetSequence;
         const countdownNumber = Math.ceil(match.countdown);
         if (phase === "playing") {
           const wasDemolished = simulation.cars[0].demolitionState !== "active";
-          simulation.step([
-            controls,
-            !match.rules.bot || simulation.cars[1].demolitionState !== "active"
-              ? neutral()
-              : opponent.sample(
-                  simulation.cars[1],
-                  simulation.ball.translation(),
-                  simulation.clock,
-                ),
-          ]);
+          if (match.mode === "party") {
+            simulation.step(partyInputs());
+          } else
+            simulation.step([
+              controls,
+              !match.rules.bot ||
+              simulation.cars[1].demolitionState !== "active"
+                ? neutral()
+                : opponent.sample(
+                    simulation.cars[1],
+                    simulation.ball.translation(),
+                    simulation.clock,
+                  ),
+            ]);
           if (wasDemolished && simulation.cars[0].demolitionState === "active")
             cameraControl.reset();
           for (const demo of simulation.demolitions)
@@ -407,7 +671,9 @@ async function boot() {
             }
         }
         if (phase === "goal") {
-          simulation.step([controls, neutral()]);
+          if (match.mode === "party") {
+            simulation.step(partyInputs());
+          } else simulation.step([controls, neutral()]);
           if (match.rules.infiniteBoost && settings.value.infiniteBoost)
             simulation.cars[0].boost = 100;
         }
@@ -446,6 +712,21 @@ async function boot() {
       alpha = match.phase === "countdown" ? 1 : result.alpha;
       tickCount += result.steps;
     } else loop.accumulator = 0;
+    if (
+      match.mode === "party" &&
+      activePartyGameId &&
+      networkGame?.id === activePartyGameId &&
+      networkGame.status === "playing" &&
+      Date.now() - lastNetworkSend >= 50
+    ) {
+      lastNetworkSend = Date.now();
+      void party.sendGameUpdate(
+        controls,
+        party.state?.hostId === party.playerId
+          ? makeNetworkSnapshot()
+          : undefined,
+      );
+    }
     simulation.cars.forEach((c, i) => {
       c.pose.render(cars[i], alpha);
       cars[i].visible = match.phase !== "home" && c.body.isEnabled();
@@ -557,7 +838,8 @@ async function boot() {
         match.phase === "goal" ? match.goalFocus : null,
       );
     const lobbyVisible = match.phase === "home" && ui.screen === "home";
-    const partySetup = match.phase === "home" && !!party.state && party.state.stage !== "home";
+    const partySetup =
+      match.phase === "home" && !!party.state && party.state.stage !== "home";
     partyPanel.flow.updateVisibility(match.phase === "home");
     partyPanel.host.hidden = !lobbyVisible;
     homeLobby.update(
@@ -631,6 +913,16 @@ async function boot() {
       cameraControl.ballMode,
       simulation.cars[0].supersonic,
     );
+    const again = document.getElementById("again") as HTMLButtonElement;
+    again.disabled =
+      match.mode === "party" && party.state?.hostId !== party.playerId;
+    again.title = again.disabled ? "The party host starts the next match" : "";
+    const resume = document.getElementById("resume") as HTMLButtonElement;
+    resume.disabled =
+      match.mode === "party" && party.state?.hostId !== party.playerId;
+    resume.title = resume.disabled
+      ? "Only the party host can resume the match"
+      : "";
     audio.update(
       Math.abs(simulation.cars[0].forwardSpeed),
       simulation.cars[0].boosting,

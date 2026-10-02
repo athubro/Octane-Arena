@@ -7,7 +7,7 @@ export class PartyFlow {
   constructor(private party: PartyClient) {
     this.dialog.id = "party-flow";
     this.dialog.setAttribute("aria-label", "Party game setup");
-    this.dialog.innerHTML = `<section id="party-mode-screen"><header><h2>CHOOSE MODE</h2><span class="party-flow-host"></span></header><div class="party-mode-cards">${partyModes.map((m) => `<button class="party-mode-card" data-mode="${m.id}" aria-pressed="false"><span class="mode-emblem" aria-hidden="true">${m.id === "1v1" ? "Ⅰ : Ⅰ" : m.id === "2v2" ? "Ⅱ : Ⅱ" : "Ⅱ : ▣"}</span><strong>${m.label}</strong></button>`).join("")}</div><footer><button class="back-button" data-stage="home">BACK</button><button id="party-continue" class="party-button" data-stage="teams">CONTINUE →</button></footer></section><section id="party-team-screen" hidden><header><div><span class="arena-caption">LUMEN DISTRICT</span><h2>CHOOSE YOUR SIDE</h2></div><span id="party-match-mode"></span></header><div class="party-team-board">${[0, 1].map((t) => `<section class="party-team-column" data-team="${t}"><header><h3>${t === 0 ? "BLUE" : "ORANGE"}</h3><span class="team-count"></span></header><div class="team-rows"></div><button class="party-button party-team-join" data-team="${t}">JOIN ${t === 0 ? "BLUE" : "ORANGE"}</button></section>`).join("")}</div><div id="party-unassigned"></div><footer><button class="back-button" data-stage="mode">CHANGE MODE</button><button id="party-team-leave" class="back-button">LEAVE PARTY</button><span class="party-network-note">NETWORK MATCHES COMING NEXT</span></footer></section><p id="party-flow-message" role="status" aria-live="polite"></p>`;
+    this.dialog.innerHTML = `<section id="party-mode-screen"><header><h2>CHOOSE MODE</h2><span class="party-flow-host"></span></header><div class="party-mode-cards">${partyModes.map((m) => `<button class="party-mode-card" data-mode="${m.id}" aria-pressed="false"><span class="mode-emblem" aria-hidden="true">${m.id === "1v1" ? "Ⅰ : Ⅰ" : m.id === "2v2" ? "Ⅱ : Ⅱ" : "Ⅱ : ▣"}</span><strong>${m.label}</strong></button>`).join("")}</div><footer><button class="back-button" data-stage="home">BACK</button><button id="party-continue" class="party-button" data-stage="teams">CONTINUE →</button></footer></section><section id="party-team-screen" hidden><header><div><span class="arena-caption">LUMEN DISTRICT</span><h2>CHOOSE YOUR SIDE</h2></div><span id="party-match-mode"></span></header><div class="party-team-board">${[0, 1].map((t) => `<section class="party-team-column" data-team="${t}"><header><h3>${t === 0 ? "BLUE" : "ORANGE"}</h3><span class="team-count"></span></header><div class="team-rows"></div><button class="party-button party-team-join" data-team="${t}">JOIN ${t === 0 ? "BLUE" : "ORANGE"}</button></section>`).join("")}</div><div id="party-unassigned"></div><footer><button class="back-button" data-stage="mode">CHANGE MODE</button><button id="party-match-start" class="party-button">START MATCH</button><button id="party-team-leave" class="back-button">LEAVE PARTY</button><span class="party-network-note">The host can start when both sides are filled.</span></footer></section><p id="party-flow-message" role="status" aria-live="polite"></p>`;
     document.getElementById("app")!.append(this.dialog);
     const leaveMode = document.createElement("button");
     leaveMode.id = "party-mode-leave";
@@ -37,6 +37,9 @@ export class PartyFlow {
       });
     this.dialog.querySelector<HTMLButtonElement>("#party-team-leave")!.onclick =
       () => void party.action("leave");
+    this.dialog.querySelector<HTMLButtonElement>(
+      "#party-match-start",
+    )!.onclick = () => void party.action("startMatch");
     this.dialog.addEventListener("cancel", (e) => {
       e.preventDefault();
       if (party.state?.hostId === party.playerId)
@@ -89,6 +92,19 @@ export class PartyFlow {
     this.dialog.querySelector<HTMLElement>("#party-match-mode")!.textContent =
       partyModes.find((m) => m.id === s.mode)!.label;
     const local = s.members.find((m) => m.id === p.playerId);
+    const blueCount = s.members.filter((m) => m.team === 0).length;
+    const orangeCount = s.members.filter((m) => m.team === 1).length;
+    const readyToStart =
+      s.members.every((m) => m.team !== null) &&
+      (s.mode === "1v1"
+        ? s.members.length === 2 && blueCount === 1 && orangeCount === 1
+        : s.mode === "2v2"
+          ? s.members.length >= 2 && blueCount > 0 && orangeCount > 0
+          : blueCount > 0 && orangeCount === 0);
+    const start =
+      this.dialog.querySelector<HTMLButtonElement>("#party-match-start")!;
+    start.hidden = !host;
+    start.disabled = p.busy || !readyToStart || s.game?.status === "playing";
     for (const team of [0, 1] as const) {
       const column = this.dialog.querySelector<HTMLElement>(
           `.party-team-column[data-team="${team}"]`,

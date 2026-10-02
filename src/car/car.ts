@@ -9,6 +9,8 @@ import { wheelMount } from "./wheels";
 export class Car {
   id = "";
   team = 0;
+  controller: "local" | "bot" | "remote" = "remote";
+  active = true;
   displayName = "Guest";
   demolitionState: "active" | "demolished" | "respawning" = "active";
   respawnTimer = 0;

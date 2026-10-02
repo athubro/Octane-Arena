@@ -10,6 +10,7 @@ import {
   type PlayerEntity,
   type PlayerInput,
 } from "../../shared/player";
+import type { MatchSnapshot } from "../../shared/party";
 import { canDemolish, respawnLocations } from "../game/demolition";
 import { bodies } from "../game/inventory";
 export interface Hit {
@@ -39,6 +40,7 @@ export class Simulation {
   private velocities: Vector3[] = [];
   private cooldown: number[] = [];
   private relative: Vector3[] = [];
+  configuredCount: number;
   constructor(
     flat = false,
     players: PlayerEntity[] = [
@@ -53,6 +55,7 @@ export class Simulation {
       players.some((p) => !p.id || ![0, 1].includes(p.team))
     )
       throw Error("A simulation needs 1–4 unique player IDs and valid teams");
+    this.configuredCount = players.length;
     this.world = new RAPIER.World({ x: 0, y: -P.gravity, z: 0 });
     this.world.timestep = P.dt;
     this.world.numSolverIterations = 8;
@@ -65,6 +68,7 @@ export class Simulation {
       c.id = players[i].id;
       c.team = players[i].team;
       c.displayName = players[i].name;
+      c.controller = players[i].controller;
     });
     this.cars.forEach((c) =>
       c.collider.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
@@ -92,17 +96,24 @@ export class Simulation {
     this.ballPose.snap();
   }
   reset() {
-    for (const c of this.cars)
+    for (const c of this.cars) {
+      if (!c.active) {
+        c.body.setEnabled(false);
+        c.collider.setCollisionGroups(0);
+        continue;
+      }
       if (c.demolitionState !== "active") {
         c.body.setEnabled(true);
         c.collider.setCollisionGroups(0xffffffff);
       }
+    }
     this.demolitions = [];
     this.lastTouchId = null;
     this.ballCollider.setCollisionGroups(0xffffffff);
     this.ball.setEnabled(true);
     for (const c of this.cars) {
-      const team = this.cars.filter((p) => p.team === c.team),
+      if (!c.active) continue;
+      const team = this.cars.filter((p) => p.active && p.team === c.team),
         slot = team.indexOf(c);
       c.reset(
         team.length === 1 ? 0 : (slot - (team.length - 1) / 2) * 12,
@@ -116,6 +127,131 @@ export class Simulation {
     this.ballPose.snap();
     this.hits = [];
     this.cooldown = this.cars.map(() => 0);
+  }
+  configurePlayers(players: PlayerEntity[]) {
+    if (
+      players.length < 1 ||
+      players.length > this.cars.length ||
+      new Set(players.map((p) => p.id)).size !== players.length ||
+      players.some((p) => !p.id || ![0, 1].includes(p.team))
+    )
+      throw Error("A simulation needs valid, unique player IDs and teams");
+    this.configuredCount = players.length;
+    this.cars.forEach((car, i) => {
+      const player = players[i];
+      car.active = !!player;
+      if (!player) {
+        car.body.setEnabled(false);
+        car.collider.setCollisionGroups(0);
+        return;
+      }
+      car.id = player.id;
+      car.displayName = player.name;
+      car.team = player.team;
+      car.controller = player.controller;
+      car.body.setEnabled(true);
+      car.collider.setCollisionGroups(0xffffffff);
+    });
+  }
+  setActiveCount(count: number) {
+    if (!Number.isInteger(count) || count < 1 || count > this.configuredCount)
+      throw Error("Invalid active player count");
+    this.cars.forEach((car, i) => {
+      car.active = i < count;
+      car.body.setEnabled(car.active);
+      car.collider.setCollisionGroups(car.active ? 0xffffffff : 0);
+    });
+  }
+  applyNetworkSnapshot(snapshot: MatchSnapshot) {
+    this.clock = snapshot.clock;
+    this.lastTouchId = snapshot.lastTouchId;
+    const ball = snapshot.ball;
+    this.ballPose.before();
+    this.ball.setEnabled(ball.enabled);
+    this.ballCollider.setCollisionGroups(ball.enabled ? 0xffffffff : 0);
+    this.ball.setTranslation(
+      { x: ball.position[0], y: ball.position[1], z: ball.position[2] },
+      true,
+    );
+    this.ball.setRotation(
+      {
+        x: ball.rotation[0],
+        y: ball.rotation[1],
+        z: ball.rotation[2],
+        w: ball.rotation[3],
+      },
+      true,
+    );
+    this.ball.setLinvel(
+      { x: ball.velocity[0], y: ball.velocity[1], z: ball.velocity[2] },
+      true,
+    );
+    this.ball.setAngvel(
+      {
+        x: ball.angularVelocity[0],
+        y: ball.angularVelocity[1],
+        z: ball.angularVelocity[2],
+      },
+      true,
+    );
+    this.ballPose.after();
+    for (const state of snapshot.cars) {
+      const car = this.cars.find((candidate) => candidate.id === state.id);
+      if (!car) continue;
+      car.pose.before();
+      car.body.setEnabled(state.enabled);
+      car.collider.setCollisionGroups(state.enabled ? 0xffffffff : 0);
+      car.body.setTranslation(
+        { x: state.position[0], y: state.position[1], z: state.position[2] },
+        true,
+      );
+      car.body.setRotation(
+        {
+          x: state.rotation[0],
+          y: state.rotation[1],
+          z: state.rotation[2],
+          w: state.rotation[3],
+        },
+        true,
+      );
+      car.body.setLinvel(
+        { x: state.velocity[0], y: state.velocity[1], z: state.velocity[2] },
+        true,
+      );
+      car.body.setAngvel(
+        {
+          x: state.angularVelocity[0],
+          y: state.angularVelocity[1],
+          z: state.angularVelocity[2],
+        },
+        true,
+      );
+      car.pose.after();
+      car.boost = state.boost;
+      car.boosting = state.boosting;
+      car.demolitionState = state.demolitionState;
+      car.respawnTimer = state.respawnTimer;
+      car.supersonic = state.supersonic;
+      car.forwardSpeed = state.forwardSpeed;
+      car.steerAngle = state.steerAngle;
+      car.grounded = state.grounded;
+      state.wheelOrigins.forEach((v, i) =>
+        car.wheelOrigins[i]?.set(v[0], v[1], v[2]),
+      );
+      state.wheelHits.forEach((v, i) =>
+        car.wheelHits[i]?.set(v[0], v[1], v[2]),
+      );
+      car.wheelContact.splice(
+        0,
+        car.wheelContact.length,
+        ...state.wheelContact,
+      );
+      const q = car.body.rotation(),
+        rotation = new Quaternion(q.x, q.y, q.z, q.w);
+      car.forward.set(0, 0, -1).applyQuaternion(rotation);
+      car.right.set(1, 0, 0).applyQuaternion(rotation);
+      car.up.set(0, 1, 0).applyQuaternion(rotation);
+    }
   }
   /** Physical blast; the match keeps steering, aerial control and boost live. */
   explode(origin: { x: number; y: number; z: number }) {

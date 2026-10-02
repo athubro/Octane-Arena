@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Simulation } from "../src/physics/simulation";
 import { neutralInput, type PlayerEntity } from "../shared/player";
 import { Match } from "../src/game/match";
+import type { MatchSnapshot } from "../shared/party";
 await RAPIER.init();
 const roster: PlayerEntity[] = Array.from({ length: 4 }, (_, i) => ({
   id: `unique-${i}-id`,
@@ -61,6 +62,77 @@ try {
   console.log(
     "PASS scoring and reset preserve unique IDs and teams, independent of names",
   );
+  s.cars[3].body.setTranslation({ x: 7, y: 2, z: -11 }, true);
+  s.cars[3].boost = 43;
+  const position = (v: { x: number; y: number; z: number }) =>
+      [v.x, v.y, v.z] as [number, number, number],
+    rotation = (q: { x: number; y: number; z: number; w: number }) =>
+      [q.x, q.y, q.z, q.w] as [number, number, number, number],
+    snapshot: MatchSnapshot = {
+      sequence: 1,
+      phase: "playing",
+      score: [2, 1],
+      remaining: 180,
+      countdown: 0,
+      freeze: 0,
+      goTime: 0,
+      overtime: false,
+      message: "",
+      resetSequence: 2,
+      lastGoal: null,
+      goalFocus: null,
+      clock: s.clock,
+      lastTouchId: s.lastTouchId,
+      ball: {
+        position: position(s.ball.translation()),
+        rotation: rotation(s.ball.rotation()),
+        velocity: position(s.ball.linvel()),
+        angularVelocity: position(s.ball.angvel()),
+        enabled: s.ball.isEnabled(),
+      },
+      cars: s.cars.map((car) => ({
+        id: car.id,
+        position: position(car.body.translation()),
+        rotation: rotation(car.body.rotation()),
+        velocity: position(car.body.linvel()),
+        angularVelocity: position(car.body.angvel()),
+        enabled: car.body.isEnabled(),
+        boost: car.boost,
+        boosting: car.boosting,
+        demolitionState: car.demolitionState,
+        respawnTimer: car.respawnTimer,
+        supersonic: car.supersonic,
+        forwardSpeed: car.forwardSpeed,
+        steerAngle: car.steerAngle,
+        grounded: car.grounded,
+        wheelOrigins: car.wheelOrigins.map(position),
+        wheelHits: car.wheelHits.map(position),
+        wheelContact: [...car.wheelContact],
+      })),
+      pads: [],
+    };
+  const receiver = new Simulation(true, [...roster].reverse());
+  try {
+    receiver.applyNetworkSnapshot(snapshot);
+    const applied = receiver.cars
+      .find((car) => car.id === roster[3].id)
+      ?.body.translation();
+    assert.deepEqual([applied?.x, applied?.y, applied?.z], [7, 2, -11]);
+    assert.equal(
+      receiver.cars.find((car) => car.id === roster[3].id)?.boost,
+      43,
+    );
+    const remoteMatch = new Match();
+    remoteMatch.applyNetworkSnapshot(snapshot);
+    assert.equal(remoteMatch.mode, "party");
+    assert.equal(remoteMatch.phase, "playing");
+    assert.deepEqual(remoteMatch.score, [2, 1]);
+    console.log(
+      "PASS remote clients apply ID-matched physics and match snapshots",
+    );
+  } finally {
+    receiver.dispose();
+  }
   assert.throws(() => new Simulation(true, [roster[0], roster[0]]));
 } finally {
   s.dispose();

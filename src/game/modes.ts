@@ -17,5 +17,14 @@ export const modes = {
     infiniteBoost: true,
     goal: "practice",
   },
+  party: {
+    bot: false,
+    scoreboard: true,
+    countdown: 3,
+    clock: true,
+    training: false,
+    infiniteBoost: false,
+    goal: "celebrate",
+  },
 } as const;
 export type Mode = keyof typeof modes;
