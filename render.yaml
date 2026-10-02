@@ -1,0 +1,36 @@
+# Render Blueprint for the Octane Arena party/API server.
+# Put this file in the ROOT of your repo (next to package.json), commit, and push.
+# Then on render.com: New -> Blueprint -> pick your repo -> Apply.
+
+services:
+  - type: web
+    name: octane-arena-server
+    runtime: node
+    # "free" sleeps after ~15 min idle (first visit then takes 30-60 s) and
+    # forgets parties/accounts on redeploy.
+    # For "always works": change to "starter" (paid) and uncomment the disk
+    # and DATABASE_PATH lines below so accounts survive restarts.
+    plan: free
+    buildCommand: npm ci && npm ci --prefix server && npm run build --prefix server
+    startCommand: node server/dist/server/src/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: TRUST_PROXY
+        value: "true"
+      # Exact origin of your Pages site: no path, no trailing slash.
+      - key: FRONTEND_ORIGINS
+        value: https://athubro.github.io
+      # Starter plan only:
+      # - key: DATABASE_PATH
+      #   value: /var/data/arena.sqlite
+    # Starter plan only:
+    # disk:
+    #   name: arena-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
