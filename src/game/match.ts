@@ -85,6 +85,7 @@ export class Match {
     }
     if (this.phase !== "playing") return;
     this.goTime = Math.max(0, this.goTime - P.dt);
+    if (this.mode === "rings") return;
     if (this.rules.clock) this.remaining = Math.max(0, this.remaining - P.dt);
     const p = s.ball.translation(),
       a = P.arena,

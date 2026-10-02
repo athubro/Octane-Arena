@@ -241,7 +241,7 @@ h1 span {
 }
 .mode-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 18px;
   margin-top: 13vh;
 }
@@ -272,6 +272,21 @@ h1 span {
   height: 64px;
   color: #88d6e4;
   filter: drop-shadow(0 0 14px #84efff33);
+}
+.rings-mode-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  color: #ffda83;
+  font-size: 76px;
+  line-height: 1;
+  text-shadow: 0 0 18px #ffbd5680;
+}
+.mode-card small {
+  color: #bfd5e1;
+  font-size: 14px;
+  line-height: 1.25;
 }
 .mode-card strong {
   font-size: clamp(18px, 2.1vw, 28px);
@@ -691,6 +706,39 @@ output {
   text-align: center;
   padding: 0 14px;
   font-variant-numeric: tabular-nums;
+}
+#ring-score {
+  position: absolute;
+  top: 98px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  min-width: 190px;
+  padding: 8px 20px 10px;
+  border: 1px solid #83ddeb88;
+  background: #0b192de8;
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 92% 100%, 8% 100%, 0 82%);
+  text-shadow: 0 0 16px #61dff477;
+}
+#ring-score strong {
+  color: #fff1be;
+  font-size: 48px;
+  line-height: 0.95;
+}
+#ring-score span {
+  color: #aeeaf1;
+  font-size: 13px;
+  letter-spacing: 0.13em;
+}
+#ring-score b {
+  margin-top: 4px;
+  color: #ffd783;
+  font-size: 17px;
+}
+#ring-score small {
+  font-size: 12px;
+  letter-spacing: 0.12em;
 }
 #notice {
   position: absolute;

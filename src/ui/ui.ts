@@ -9,9 +9,9 @@ export class UI {
     this.root.innerHTML = `<div id="viewport"></div><div id="home-shade"></div><header id="brand"><h1>OCTANE <span>ARENA</span></h1></header>
     <section id="menu" class="screen"><nav class="home-nav"><button id="play" class="nav-button primary">PLAY <span aria-hidden="true">↗</span></button><button id="garage-open" class="nav-button">GARAGE</button><button id="settings-open" class="nav-button">SETTINGS</button></nav></section>
     <button id="profile" aria-label="Open profile"><div class="avatar">${icon("profile")}</div><div><b id="profile-name">Guest</b><span id="profile-title">Rookie</span></div><div class="level"><small>LEVEL</small><b id="profile-level">1</b></div></button>
-    <section id="modes" class="screen full-screen" hidden><h2>PLAY</h2><div class="mode-grid"><button id="bot-mode" class="mode-card">${icon("bot")}<strong>AGAINST A BOT</strong></button><button id="freeplay-mode" class="mode-card">${icon("freeplay")}<strong>FREE PLAY</strong></button><button class="mode-card" disabled title="Ranked is coming later">${icon("ranked")}<strong>RANKED</strong><i>${icon("lock")}</i></button><button class="mode-card" disabled title="Friend matches are coming later">${icon("friend")}<strong>AGAINST A FRIEND</strong><i>${icon("lock")}</i></button></div><footer class="screen-footer"><button id="modes-back" class="back-button">← BACK</button></footer></section>
+    <section id="modes" class="screen full-screen" hidden><h2>PLAY</h2><div class="mode-grid"><button id="bot-mode" class="mode-card">${icon("bot")}<strong>AGAINST A BOT</strong></button><button id="freeplay-mode" class="mode-card">${icon("freeplay")}<strong>FREE PLAY</strong></button><button id="rings-mode" class="mode-card"><span class="rings-mode-icon" aria-hidden="true">◎</span><strong>RING RUSH</strong><small>FLY THROUGH THE COURSE. KEEP YOUR STREAK ALIVE.</small></button><button class="mode-card" disabled title="Ranked is coming later">${icon("ranked")}<strong>RANKED</strong><i>${icon("lock")}</i></button><button class="mode-card" disabled title="Friend matches are coming later">${icon("friend")}<strong>AGAINST A FRIEND</strong><i>${icon("lock")}</i></button></div><footer class="screen-footer"><button id="modes-back" class="back-button">← BACK</button></footer></section>
     <section id="garage-screen" class="screen full-screen" hidden></section>
-    <div id="hud" hidden><div class="scoreboard"><span id="score-cyan">0</span><time id="clock">5:00</time><span id="score-amber">0</span></div><div id="notice" aria-live="polite"></div><div id="countdown" aria-live="polite"></div><div class="camera-status"><i></i><b id="camera-mode">BALL CAMERA</b></div><div class="boost-hud"><svg viewBox="0 0 160 160" aria-hidden="true"><path class="boost-track" d="M128 128 A68 68 0 1 0 32 128" pathLength="100"/><path id="boost-fill" d="M32 128 A68 68 0 1 1 128 128" pathLength="100"/></svg><div id="boost">100</div><div id="boost-label">BOOST</div></div><div id="bot-tag" hidden></div></div>
+    <div id="hud" hidden><div class="scoreboard"><span id="score-cyan">0</span><time id="clock">5:00</time><span id="score-amber">0</span></div><div id="ring-score" hidden><strong id="ring-streak">0</strong><span>RING STREAK</span><b id="ring-best">BEST 0</b><small id="ring-next">RING 1 / 9</small></div><div id="notice" aria-live="polite"></div><div id="countdown" aria-live="polite"></div><div class="camera-status"><i></i><b id="camera-mode">BALL CAMERA</b></div><div class="boost-hud"><svg viewBox="0 0 160 160" aria-hidden="true"><path class="boost-track" d="M128 128 A68 68 0 1 0 32 128" pathLength="100"/><path id="boost-fill" d="M32 128 A68 68 0 1 1 128 128" pathLength="100"/></svg><div id="boost">100</div><div id="boost-label">BOOST</div></div><div id="bot-tag" hidden></div></div>
     <section id="pause" class="modal" hidden><div class="modal-card"><h2>PAUSED</h2><button id="resume" class="nav-button primary">RESUME</button><button id="pause-settings" class="nav-button">SETTINGS</button><button id="pause-controls" class="nav-button">CONTROLS</button><button id="pause-reset" class="nav-button">RESET</button><button id="pause-home" class="nav-button">LEAVE MATCH</button></div></section>
     <section id="result" class="modal" hidden><div class="modal-card"><h2 id="result-title"></h2><p id="result-score"></p><button id="again" class="nav-button primary">PLAY AGAIN</button><button id="home" class="nav-button">HOME</button></div></section><dialog id="settings"></dialog><dialog id="account" aria-label="Account"></dialog><pre id="debug" hidden></pre>`;
   }
@@ -62,7 +62,13 @@ export class UI {
       }
     };
     const home = m.phase === "home";
-    document.getElementById("pause-reset")!.hidden = !m.rules.training;
+    const ringMode = m.mode === "rings";
+    document.getElementById("pause-reset")!.hidden =
+      !m.rules.training && !ringMode;
+    document.getElementById("pause-reset")!.textContent = ringMode
+      ? "RESTART RUN"
+      : "RESET";
+    document.getElementById("ring-score")!.hidden = !ringMode;
     (document.querySelector(".scoreboard") as HTMLElement).hidden =
       !m.rules.scoreboard;
     for (const [id, show] of [
@@ -83,11 +89,13 @@ export class UI {
     const t = Math.ceil(m.remaining);
     set(
       "clock",
-      m.mode === "freeplay"
-        ? "FREE PLAY"
-        : m.overtime
-          ? "OT"
-          : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`,
+      m.mode === "rings"
+        ? "RING RUSH"
+        : m.mode === "freeplay"
+          ? "FREE PLAY"
+          : m.overtime
+            ? "OT"
+            : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`,
     );
     set("boost", String(Math.ceil(boost)));
     document.getElementById("boost-fill")!.style.strokeDasharray =
@@ -111,6 +119,25 @@ export class UI {
     );
     set("camera-mode", ballCamera ? "BALL CAMERA" : "CAR CAMERA");
     set("result-title", m.message);
-    set("result-score", `${m.score[0]} — ${m.score[1]}`);
+    set(
+      "result-score",
+      ringMode
+        ? `RINGS ${m.score[0]} · BEST ${m.score[1]}`
+        : `${m.score[0]} — ${m.score[1]}`,
+    );
+  }
+
+  updateRingChallenge(
+    streak: number,
+    best: number,
+    ring: number,
+    total: number,
+  ) {
+    document.getElementById("ring-streak")!.textContent = String(streak);
+    document.getElementById("ring-best")!.textContent = `BEST ${best}`;
+    document.getElementById("ring-next")!.textContent =
+      `RING ${ring} / ${total}`;
+    document.querySelector("#rings-mode small")!.textContent =
+      `BEST STREAK · ${best} RINGS`;
   }
 }

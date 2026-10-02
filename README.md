@@ -20,6 +20,10 @@ A desktop browser with WebGL 2 and
 a keyboard or standard gamepad is required. Click PLAY to unlock browser audio.
 The game pauses on focus loss. Touch driving is not implemented.
 
+Choose **PLAY → RING RUSH** for an aerial course challenge. Follow the lit rings
+in order; missing a gate ends the run. The HUD tracks your current streak and
+your best streak on this device. Boost is unlimited for the challenge.
+
 To play a match over the same Wi-Fi, install the backend dependencies once with
 `npm --prefix server install`, then run **`npm run lan`** on the host computer.
 Keep it running, create a party, and share the party code. Other players open
@@ -86,7 +90,7 @@ and goal driving while preserving powerslide and jump behavior.
 | Ctrl                       | Powerslide; hold with A/D for air roll                                |
 | Q / E                      | Air roll                                                              |
 | C                          | Ball / car camera                                                     |
-| 1 / 2 / 3 / 4             | Free Play: reset / take possession / start dribble / launch ball      |
+| 1 / 2 / 3 / 4              | Free Play: reset / take possession / start dribble / launch ball      |
 | Escape                     | Pause / resume                                                        |
 | F3                         | Physics telemetry and collision graphics                              |
 

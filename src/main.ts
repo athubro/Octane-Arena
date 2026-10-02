@@ -42,6 +42,8 @@ import { GoalPlanes } from "./effects/goal-plane";
 import { BallTrails, FlipTrails } from "./effects/motion-trails";
 import { PadRecharge } from "./render/pad-recharge";
 import { DemolitionFlash } from "./effects/demolition-flash";
+import { RingChallenge } from "./game/ring-challenge";
+import { RingCourseView } from "./render/ring-course";
 import type {
   MatchSnapshot,
   PartyGame,
@@ -65,9 +67,12 @@ async function boot() {
     opponent = new Opponent(),
     botBrains = simulation.cars.map(() => new Opponent()),
     match = new Match(),
+    ringChallenge = new RingChallenge(),
     pads = new Pads(),
     audio = new GameAudio();
   ui.setProfile(garage.profile);
+  document.querySelector("#rings-mode small")!.textContent =
+    `BEAT YOUR BEST · ${ringChallenge.best} RINGS`;
   const renderer = new T.WebGLRenderer({
     antialias: false,
     powerPreference: "high-performance",
@@ -98,6 +103,7 @@ async function boot() {
   sun.shadow.bias = -0.0005;
   scene.add(sun);
   const arena = drawArena(scene);
+  const ringCourse = new RingCourseView(scene, ringChallenge);
   const visuals = [
     carModel(
       new T.Color(garage.current.blue).getHex(),
@@ -258,13 +264,19 @@ async function boot() {
     stay;
   const loop = new FixedLoop();
   const start = (
-    mode: "bot" | "freeplay" = match.mode === "freeplay" ? "freeplay" : "bot",
+    mode: "bot" | "freeplay" | "rings" = match.mode === "freeplay"
+      ? "freeplay"
+      : match.mode === "rings"
+        ? "rings"
+        : "bot",
   ) => {
     ui.modes(false);
     resetEffects();
     audio.unlock();
     input.clear();
     updatePreset();
+    ringChallenge.start();
+    ringCourse.syncActiveGate();
     opponent.rename();
     simulation.configurePlayers([
       {
@@ -278,11 +290,16 @@ async function boot() {
     document.getElementById("bot-tag")!.textContent = opponent.name;
     activePartyGameId = null;
     match.start(simulation, mode);
+    if (mode === "rings") {
+      simulation.ballCollider.setCollisionGroups(0);
+      simulation.ball.setEnabled(false);
+    }
     arena.setNeutral(match.rules.training);
     goalPlanes.setNeutral(match.rules.training);
     pads.reset();
     loop.accumulator = 0;
     cameraControl.reset();
+    cameraControl.ballMode = mode !== "rings";
     audio.tone(420, 0.12, 0.08, "sine");
   };
   const startParty = (game: PartyGame) => {
@@ -362,6 +379,7 @@ async function boot() {
   });
   ui.on("bot-mode", () => start("bot"));
   ui.on("freeplay-mode", () => start("freeplay"));
+  ui.on("rings-mode", () => start("rings"));
   ui.on("garage-open", () => {
     ui.screen = "garage";
     garagePanel.customizing = false;
@@ -402,7 +420,9 @@ async function boot() {
   ui.on("pause-settings", openSettings);
   ui.on("pause-controls", () => settingsPanel.open("controls"));
   ui.on("pause-reset", () => {
-    if (match.rules.training) {
+    if (match.mode === "rings") {
+      start("rings");
+    } else if (match.rules.training) {
       match.kickoff(simulation);
       resetEffects();
       pads.reset();
@@ -441,6 +461,7 @@ async function boot() {
     tickCount = 0,
     statsTime = 0,
     ticksPerSecond = 0;
+  const ringPrevious = new T.Vector3();
   const vectorTuple = (v: { x: number; y: number; z: number }): Vec3Tuple => [
       v.x,
       v.y,
@@ -502,6 +523,7 @@ async function boot() {
   function frame(now: number) {
     const dt = Math.min((now - previous) / 1000, 0.1);
     previous = now;
+    ringCourse.setVisible(match.mode === "rings" && match.phase !== "home");
     const controls = input.sample();
     const networkGame = party.state?.game ?? null;
     const partyInputs = () => {
@@ -614,6 +636,8 @@ async function boot() {
         const countdownNumber = Math.ceil(match.countdown);
         if (phase === "playing") {
           const wasDemolished = simulation.cars[0].demolitionState !== "active";
+          if (match.mode === "rings")
+            ringPrevious.copy(simulation.cars[0].body.translation());
           if (match.mode === "party") {
             simulation.step(partyInputs());
           } else
@@ -628,6 +652,30 @@ async function boot() {
                     simulation.clock,
                   ),
             ]);
+          if (match.mode === "rings") {
+            const result = ringChallenge.cross(
+              ringPrevious,
+              simulation.cars[0].body.translation(),
+            );
+            if (result === "passed") {
+              ringCourse.syncActiveGate();
+              const previousIndex =
+                (ringChallenge.ringIndex + ringChallenge.count - 1) %
+                ringChallenge.count;
+              effects.burst(ringChallenge.centers[previousIndex], 0xffd777);
+              audio.tone(
+                540 + Math.min(500, ringChallenge.streak * 35),
+                0.14,
+                0.08,
+                "sine",
+              );
+            } else if (result === "missed") {
+              match.score = [ringChallenge.streak, ringChallenge.best];
+              match.phase = "finished";
+              match.message = "RUN OVER";
+              audio.tone(130, 0.35, 0.12, "triangle");
+            }
+          }
           if (wasDemolished && simulation.cars[0].demolitionState === "active")
             cameraControl.reset();
           for (const demo of simulation.demolitions)
@@ -644,7 +692,10 @@ async function boot() {
               effects.emit(demo.position, new T.Vector3(0, 5, 0), 0x74859a, 55);
               audio.tone(85, 0.45, 0.23, "sawtooth");
             }
-          if (match.rules.infiniteBoost && settings.value.infiniteBoost)
+          if (
+            match.rules.infiniteBoost &&
+            (match.mode === "rings" || settings.value.infiniteBoost)
+          )
             simulation.cars[0].boost = 100;
           for (const pickup of pads.tick(simulation.cars)) {
             const pos = new T.Vector3().copy(pickup.car.body.translation());
@@ -674,7 +725,10 @@ async function boot() {
           if (match.mode === "party") {
             simulation.step(partyInputs());
           } else simulation.step([controls, neutral()]);
-          if (match.rules.infiniteBoost && settings.value.infiniteBoost)
+          if (
+            match.rules.infiniteBoost &&
+            (match.mode === "rings" || settings.value.infiniteBoost)
+          )
             simulation.cars[0].boost = 100;
         }
         match.tick(simulation);
@@ -741,7 +795,7 @@ async function boot() {
     });
     simulation.ballPose.render(ball, alpha);
     animateBall(ball, now / 1000);
-    ball.visible = simulation.ball.isEnabled();
+    ball.visible = simulation.ball.isEnabled() && match.mode !== "rings";
     goalPlanes.update(ball);
     ballShadow.visible = ball.visible;
     if (match.phase === "home") {
@@ -913,6 +967,12 @@ async function boot() {
       cameraControl.ballMode,
       simulation.cars[0].supersonic,
     );
+    ui.updateRingChallenge(
+      ringChallenge.streak,
+      ringChallenge.best,
+      ringChallenge.ringIndex + 1,
+      ringChallenge.count,
+    );
     const again = document.getElementById("again") as HTMLButtonElement;
     again.disabled =
       match.mode === "party" && party.state?.hostId !== party.playerId;
@@ -939,6 +999,8 @@ async function boot() {
       __arena: {
         simulation,
         match,
+        ringChallenge,
+        ringCourse,
         input,
         settings,
         garage,

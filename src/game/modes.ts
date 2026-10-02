@@ -17,6 +17,15 @@ export const modes = {
     infiniteBoost: true,
     goal: "practice",
   },
+  rings: {
+    bot: false,
+    scoreboard: false,
+    countdown: 0,
+    clock: false,
+    training: false,
+    infiniteBoost: true,
+    goal: "practice",
+  },
   party: {
     bot: false,
     scoreboard: true,
