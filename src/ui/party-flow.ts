@@ -129,11 +129,13 @@ export class PartyFlow {
           : (m?.name ?? "OPEN SLOT");
         tag.textContent = bots
           ? "BOT"
-          : m?.id === p.playerId
-            ? "YOU"
-            : m?.id === s.hostId
-              ? "HOST"
-              : "";
+          : m?.connected === false
+            ? "DISCONNECTED"
+            : m?.id === p.playerId
+              ? "YOU"
+              : m?.id === s.hostId
+                ? "HOST"
+                : "";
         if (m) row.dataset.player = m.id;
         row.append(name, tag);
         rows.append(row);

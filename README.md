@@ -14,8 +14,8 @@ npm install
 npm run dev
 ```
 
-Open the printed local URL and select **PLAY → AGAINST A BOT**. Ranked and friend
-matches are clearly marked as coming later; no online matchmaking is implemented.
+Open the printed local URL and select **PLAY → AGAINST A BOT**. Ranked and public
+matchmaking are not implemented.
 A desktop browser with WebGL 2 and
 a keyboard or standard gamepad is required. Click PLAY to unlock browser audio.
 The game pauses on focus loss. Touch driving is not implemented.
@@ -24,14 +24,13 @@ Choose **PLAY → RING RUSH** for an aerial course challenge. Follow the lit rin
 in order; missing a gate ends the run. The HUD tracks your current streak and
 your best streak on this device. Boost is unlimited for the challenge.
 
-To play a match over the same Wi-Fi, install the backend dependencies once with
-`npm --prefix server install`, then run **`npm run lan`** on the host computer.
-Keep it running, create a party, and share the party code. Other players open
-the LAN address printed in the terminal, join the party, choose the same game
-mode and sides, then the host selects **START MATCH**. The host browser runs the
-authoritative physics; controls and match snapshots are relayed through the LAN
-server to the other players. 1v1, 2v2 and 2v2 Bots are supported. See
-[LAN setup and gameplay details](docs/LAN-PHASE1.md).
+Create or join a party directly in the browser using WebRTC. The host's browser
+owns the party and match state; player controls and match snapshots travel over
+WebRTC data channels. No Node server is needed for party play. The public
+PeerJS broker is used only to introduce peers, with a native manual offer/answer
+path if the broker cannot be reached. There is no TURN relay, so school or guest
+Wi-Fi may block direct connections. See the
+[WebRTC lobby guide](docs/WEBRTC-LOBBY.md) and [LAN checklist](docs/LAN-PHASE1.md).
 
 The home screen has Play, Garage and Settings on the left, plus a compact clickable Guest/account
 profile. Garage includes two original starter bodies (Ion and Vector), curated
@@ -51,9 +50,12 @@ number; Enter or blur applies it, Escape cancels, and values clamp to the range.
 Optional persistent accounts use a separate TypeScript API and SQLite database.
 The game remains fully playable as Guest. Configure the backend using
 [server/README.md](server/README.md); the production addresses are intentionally
-unset until hosting is chosen. Accounts synchronize presets, cosmetics, settings,
-avatars and titles. XP/level and future rating fields are server-owned foundations;
-match rewards and ranked multiplayer are not implemented.
+unset until hosting is chosen. The backend is only needed for persistent accounts;
+party and match networking always uses WebRTC, even when an account API is
+configured. Accounts synchronize presets, cosmetics, settings, avatars and titles.
+Party players are guests for networking, and garage presets remain local. XP/level
+and future rating fields are server-owned foundations; match rewards are not
+implemented.
 
 The arena's original **Lumen District** theme includes a twilight skyline,
 illuminated buildings and skybridges. Lower wall curves are opaque and marked

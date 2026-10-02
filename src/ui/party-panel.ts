@@ -7,11 +7,16 @@ export class PartyPanel {
   flow: PartyFlow;
   private joining = false;
   private selected: string | null = null;
+  private manualDialog = document.createElement("dialog");
   constructor(public party: PartyClient) {
     this.host.id = "party-panel";
     this.host.setAttribute("aria-label", "Party");
-    this.host.innerHTML = `<div class="party-top"><button id="party-code" title="Copy party code" hidden></button><div id="party-members" role="group" aria-label="Party members"></div><div id="party-actions" hidden><b></b><button id="party-kick">KICK</button><button id="party-dismiss" aria-label="Close player actions">×</button></div></div><div class="party-controls"><button id="party-create" class="party-button">CREATE PARTY</button><button id="party-join-open" class="party-button">JOIN PARTY</button><form id="party-join" hidden><input id="party-input" aria-label="Party code" placeholder="ENTER CODE" maxlength="6" autocomplete="off" spellcheck="false"><button class="party-button" type="submit">JOIN</button><button class="party-button" type="button" id="party-cancel">CANCEL</button></form><button id="party-leave" class="party-button" hidden>LEAVE PARTY</button></div><div id="party-message" role="status" aria-live="polite"></div>`;
+    this.host.innerHTML = `<div class="party-top"><button id="party-code" title="Copy party code" hidden></button><div id="party-members" role="group" aria-label="Party members"></div><div id="party-actions" hidden><b></b><button id="party-kick">KICK</button><button id="party-dismiss" aria-label="Close player actions">×</button></div></div><div class="party-controls"><button id="party-create" class="party-button">CREATE PARTY</button><button id="party-join-open" class="party-button">JOIN PARTY</button><button id="party-manual-open" class="party-button">MANUAL CODES</button><form id="party-join" hidden><input id="party-input" aria-label="Party code" placeholder="ENTER CODE" maxlength="6" autocomplete="off" spellcheck="false"><button class="party-button" type="submit">JOIN</button><button class="party-button" type="button" id="party-cancel">CANCEL</button></form><button id="party-leave" class="party-button" hidden>LEAVE PARTY</button></div><div class="party-network-note">WEBRTC · NO TURN RELAY · SOME WI-FI NETWORKS BLOCK DEVICE-TO-DEVICE TRAFFIC</div><div id="party-message" role="status" aria-live="polite"></div>`;
     document.getElementById("app")!.append(this.host);
+    this.manualDialog.id = "party-manual";
+    this.manualDialog.setAttribute("aria-label", "Manual WebRTC connection");
+    this.manualDialog.innerHTML = `<section><header><h2>MANUAL WEBRTC CONNECTION</h2><button type="button" id="manual-close" aria-label="Close">×</button></header><p>No broker is used for manual codes. There is no TURN relay; school or guest Wi-Fi may still block device-to-device traffic.</p><nav><button type="button" class="party-button" id="manual-host-open">HOST PARTY</button><button type="button" class="party-button" id="manual-join-open">JOIN PARTY</button></nav><div id="manual-host" hidden><b>PARTY CODE: <span id="manual-host-code"></span></b><label>Paste the joiner's offer code here<textarea id="manual-host-offer" rows="5" spellcheck="false"></textarea></label><button type="button" class="party-button" id="manual-answer">CREATE ANSWER</button><label>Send this answer code to the joiner<textarea id="manual-host-answer" rows="5" readonly spellcheck="false"></textarea></label></div><div id="manual-join" hidden><label>Party code<input id="manual-code" maxlength="6" autocomplete="off" spellcheck="false"></label><button type="button" class="party-button" id="manual-offer">GENERATE OFFER</button><label>Send this offer code to the host<textarea id="manual-guest-offer" rows="5" readonly spellcheck="false"></textarea></label><label>Paste the host's answer code here<textarea id="manual-guest-answer" rows="5" spellcheck="false"></textarea></label><button type="button" class="party-button" id="manual-connect">CONNECT</button></div><p id="manual-message" role="status" aria-live="polite"></p></section>`;
+    document.getElementById("app")!.append(this.manualDialog);
     this.flow = new PartyFlow(party);
     const start = document.createElement("button");
     start.id = "party-start";
@@ -22,6 +27,9 @@ export class PartyPanel {
     const find = (id: string) =>
       this.host.querySelector<HTMLElement>("#" + id)!;
     find("party-create").onclick = () => void party.action("create");
+    find("party-manual-open").onclick = () => {
+      this.manualDialog.showModal();
+    };
     find("party-join-open").onclick = () => {
       this.joining = true;
       party.message = "";
@@ -48,6 +56,84 @@ export class PartyPanel {
         party.message = "COPY CODE: " + party.state!.code;
       }
       this.render();
+    };
+    const manual = (selector: string) =>
+      this.manualDialog.querySelector<HTMLElement>(selector)!;
+    manual("#manual-close").onclick = () => this.manualDialog.close();
+    manual("#manual-host-open").onclick = async () => {
+      const message = manual("#manual-message");
+      message.textContent = "";
+      try {
+        const code =
+          party.state?.hostId === party.playerId
+            ? party.state.code
+            : await party.createManualHost();
+        manual("#manual-host-code").textContent = code;
+        manual("#manual-host").hidden = false;
+        manual("#manual-join").hidden = true;
+      } catch (error) {
+        message.textContent =
+          error instanceof Error ? error.message : "FAILED TO CREATE PARTY";
+      }
+    };
+    manual("#manual-join-open").onclick = () => {
+      manual("#manual-host").hidden = true;
+      manual("#manual-join").hidden = false;
+      if (party.state && party.state.hostId !== party.playerId)
+        (manual("#manual-code") as HTMLInputElement).value = party.state.code;
+      else if (party.manualRejoinCode)
+        (manual("#manual-code") as HTMLInputElement).value =
+          party.manualRejoinCode;
+      manual("#manual-code").focus();
+    };
+    manual("#manual-answer").onclick = async () => {
+      const message = manual("#manual-message");
+      message.textContent = "GATHERING ICE CANDIDATES…";
+      try {
+        const answer = await party.answerManualOffer(
+          (manual("#manual-host-offer") as HTMLTextAreaElement).value.trim(),
+        );
+        (manual("#manual-host-answer") as HTMLTextAreaElement).value = answer;
+        message.textContent = "ANSWER READY — COPY IT TO THE JOINER";
+      } catch (error) {
+        message.textContent =
+          error instanceof Error ? error.message : "FAILED TO CREATE ANSWER";
+      }
+    };
+    manual("#manual-offer").onclick = async () => {
+      const code = normalizePartyCode(
+        (manual("#manual-code") as HTMLInputElement).value,
+      );
+      const message = manual("#manual-message");
+      if (!validPartyCode(code)) {
+        message.textContent = "INVALID PARTY CODE";
+        return;
+      }
+      message.textContent = "GATHERING ICE CANDIDATES…";
+      try {
+        const offer = await party.makeManualOffer(code);
+        (manual("#manual-guest-offer") as HTMLTextAreaElement).value = offer;
+        message.textContent = "OFFER READY — COPY IT TO THE HOST";
+      } catch (error) {
+        message.textContent =
+          error instanceof Error ? error.message : "FAILED TO CREATE OFFER";
+      }
+    };
+    manual("#manual-connect").onclick = async () => {
+      const code = normalizePartyCode(
+        (manual("#manual-code") as HTMLInputElement).value,
+      );
+      const message = manual("#manual-message");
+      try {
+        await party.acceptManualAnswer(
+          code,
+          (manual("#manual-guest-answer") as HTMLTextAreaElement).value.trim(),
+        );
+        this.manualDialog.close();
+      } catch (error) {
+        message.textContent =
+          error instanceof Error ? error.message : "CONNECTION FAILED";
+      }
     };
     this.host.querySelector<HTMLInputElement>("input")!.oninput = (e) => {
       const input = e.target as HTMLInputElement;
@@ -94,6 +180,11 @@ export class PartyPanel {
     const get = (id: string) => this.host.querySelector<HTMLElement>("#" + id)!;
     get("party-create").hidden = !!s || this.joining;
     get("party-join-open").hidden = !!s || this.joining;
+    get("party-manual-open").hidden =
+      (!!s &&
+        p.connection !== "offline" &&
+        s.hostId !== p.playerId) ||
+      this.joining;
     get("party-join").hidden = !!s || !this.joining;
     get("party-leave").hidden = !s;
     get("party-code").hidden = !s;
@@ -109,7 +200,14 @@ export class PartyPanel {
     this.flow.render();
     const strip = get("party-members"),
       signature = JSON.stringify([
-        s?.members.map((m) => [m.id, m.name, m.avatarId, m.team, m.ready]),
+        s?.members.map((m) => [
+          m.id,
+          m.name,
+          m.avatarId,
+          m.team,
+          m.ready,
+          m.connected,
+        ]),
         s?.hostId,
         this.selected,
       ]);
@@ -122,7 +220,8 @@ export class PartyPanel {
         b.className = "party-avatar";
         b.dataset.player = m.id;
         b.dataset.team = String(m.team);
-        b.title = `${m.name} · ${m.team === null ? "Unassigned" : m.team === 0 ? "Blue" : "Orange"}`;
+        b.title = `${m.name} · ${m.team === null ? "Unassigned" : m.team === 0 ? "Blue" : "Orange"}${m.connected === false ? " · Disconnected" : ""}`;
+        if (m.connected === false) b.classList.add("disconnected");
         b.setAttribute(
           "aria-label",
           b.title + (m.id === s.hostId ? " — Party leader" : ""),

@@ -1,4 +1,9 @@
-import type { PartyMember, PartyMode, PartyStage, PartyState } from "./party.js";
+import type {
+  PartyMember,
+  PartyMode,
+  PartyStage,
+  PartyState,
+} from "./party.js";
 
 export type PartyLobbyAction =
   | { type: "team"; team: PartyMember["team"] }
@@ -39,7 +44,8 @@ export function joinPartyState(
       ? null
       : (([0, 1] as const).find(
           (team) =>
-            party.members.filter((candidate) => candidate.team === team).length <
+            party.members.filter((candidate) => candidate.team === team)
+              .length <
             (party.mode === "2v2bots" && team === 1
               ? 0
               : party.mode === "1v1"
@@ -47,6 +53,7 @@ export function joinPartyState(
                 : 2),
         ) ?? null);
   member.ready = false;
+  member.connected = true;
   party.members.push(member);
   return {};
 }
@@ -62,11 +69,7 @@ export function applyPartyLobbyAction(
     return { status: 409, error: "MATCH IN PROGRESS" };
 
   if (action.type === "team") {
-    if (
-      action.team !== null &&
-      action.team !== 0 &&
-      action.team !== 1
-    )
+    if (action.team !== null && action.team !== 0 && action.team !== 1)
       return { status: 400, error: "INVALID TEAM" };
     if (
       action.team !== null &&
@@ -113,6 +116,8 @@ export function applyPartyLobbyAction(
       (member) => member.id === action.playerId,
     );
     if (!target) return { status: 404, error: "PLAYER NOT FOUND" };
+    if (target.id === party.hostId)
+      return { status: 400, error: "CANNOT KICK THE HOST" };
     party.members = party.members.filter(
       (member) => member.id !== action.playerId,
     );
@@ -128,7 +133,10 @@ export function applyPartyLobbyAction(
     const counts = [0, 0];
     for (const member of party.members) {
       member.ready = false;
-      if (member.team !== null && ++counts[member.team] > capacity(action.mode, member.team))
+      if (
+        member.team !== null &&
+        ++counts[member.team] > capacity(action.mode, member.team)
+      )
         member.team = null;
     }
     return {};

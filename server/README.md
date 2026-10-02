@@ -58,15 +58,18 @@ Production cookies are `__Host-oa_session; Secure; HttpOnly; SameSite=None; Part
 
 ## Data and API
 
-### Same-Wi-Fi matches
+### Party networking
 
-`npm run lan` builds the frontend and starts the combined party service on
-`0.0.0.0:8090`. Parties choose a mode and teams, then the host starts the match.
-The host browser is authoritative for physics and scoring; clients submit
-validated ID-associated controls at 20Hz, and the party event stream distributes
-host snapshots for rendering. LAN match state is in memory, so the host server
-must stay running. This is a small trusted-LAN feature, not a dedicated or
-anti-cheat-protected public game server.
+The browser uses WebRTC for all party and party-match traffic; configuring this
+API does not switch party play back to HTTP/SSE. A party host's browser owns the
+in-memory lobby and authoritative match simulation. PeerJS uses its public
+broker only for introduction, and native manual offer/answer codes provide a
+broker-free signaling path. No TURN relay is configured, so direct connections
+can fail on restrictive Wi-Fi. See [the WebRTC lobby guide](../docs/WEBRTC-LOBBY.md).
+
+The legacy `npm run lan` combined server and its party HTTP/SSE endpoints remain
+available for older clients and regression tests, but the current frontend does
+not use them for party or match data. This service remains optional for accounts.
 
 SQLite runs in WAL mode with foreign keys and a busy timeout. Schema version 1 is explicit; unknown versions refuse startup. Tables separate accounts, profiles, owned items, presets, per-field preferences, ratings and sessions. Usernames preserve display case but uniqueness/login use lowercase ASCII; identities are independent UUIDs. New accounts have two original bodies, starter cosmetics/titles, 0 XP, level 1, and unrated 1v1/2v2/3v3 rows. Existing Guest presets remain separate on their device.
 

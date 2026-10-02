@@ -1529,5 +1529,19 @@ output {
 #party-unassigned {font-size:13px;min-height:18px;color:#d1dfeb;text-align:center;}
 #party-flow-message {color:#ffce99;text-align:center;min-height:20px;font-size:14px;margin:12px 0 0;}
 .party-network-note {font-size:11px;color:#c2d0de;letter-spacing:.08em;}
+#party-panel>.party-network-note {max-width:min(94vw,760px);text-align:center;line-height:1.4;}
+.party-avatar.disconnected {filter:grayscale(1);opacity:.55;}
+#party-manual {width:min(760px,92vw);max-height:90dvh;padding:20px;color:#f0faff;background:#0b1d31;border:1px solid #6a8ba6;border-radius:12px;overflow:auto;}
+#party-manual::backdrop {background:#020a16bb;backdrop-filter:blur(3px);}
+#party-manual section,#party-manual #manual-host,#party-manual #manual-join {display:flex;flex-direction:column;gap:12px;}
+#party-manual #manual-host[hidden],#party-manual #manual-join[hidden] {display:none;}
+#party-manual header,#party-manual nav {display:flex;align-items:center;justify-content:space-between;gap:10px;}
+#party-manual h2 {font-size:clamp(18px,4vw,26px);margin:0;}
+#party-manual p {line-height:1.5;color:#c2d0de;}
+#party-manual label {display:flex;flex-direction:column;gap:6px;font-size:13px;}
+#party-manual textarea,#party-manual input {width:100%;padding:10px;color:#f0faff;background:#061321;border:1px solid #63809a;border-radius:6px;font:12px/1.4 monospace;overflow-wrap:anywhere;}
+#party-manual textarea {resize:vertical;user-select:all;}
+#party-manual textarea[readonly] {color:#c1e8f2;}
+#manual-message {min-height:1.4em;color:#ffce99;}
 @media(max-width:759px){#party-panel{bottom:7%;}#home-car-area{bottom:29%;}.party-mode-cards{grid-template-columns:1fr;gap:12px;}.party-mode-card{min-height:110px;flex-direction:row;gap:22px;}.mode-emblem{font-size:36px;}.party-team-board{gap:12px;}.party-team-column{padding:12px;}.party-team-column h3{font-size:20px;}#party-flow footer{flex-wrap:wrap;}#party-flow>section{gap:20px;}.party-network-note{width:100%;}#party-flow header{flex-wrap:wrap;}.party-team-join{padding:8px 4px;}}
 @media(prefers-reduced-motion:reduce){#party-flow>section{animation:none;}.party-mode-card{transition:none;}}

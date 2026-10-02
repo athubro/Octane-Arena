@@ -1,168 +1,140 @@
 import type { Garage } from "./inventory";
-import type { PartyReply, PartyState, PartyActions } from "../../shared/party";
-import type { MatchSnapshot } from "../../shared/party";
+import type {
+  MatchSnapshot,
+  PartyActions,
+  PartyReply,
+  PartyState,
+} from "../../shared/party";
 import type { PlayerInput } from "../../shared/player";
-import { loadBackendEndpoints } from "./backend";
+import {
+  createPartyToken,
+  WebRtcPartyTransport,
+  type PartyTransportCallbacks,
+  type PartyTransport,
+} from "./party-transport";
+
+const TOKEN_KEY = "arena-webrtc-party-session";
+const CODE_KEY = "arena-webrtc-party-code";
+const ROLE_KEY = "arena-webrtc-party-role";
+const MODE_KEY = "arena-webrtc-party-transport";
+
 export class PartyClient {
   state: PartyState | null = null;
   playerId = "local";
   message = "";
   busy = false;
-  private url = "";
-  private connected = false;
-  private fingerprint = "";
-  private ready: Promise<void>;
-  private token = "";
-  private stream: AbortController | null = null;
-  private gameBusy = false;
   connection: "offline" | "connected" = "offline";
+  manualRejoinCode = "";
+  private token = "";
+  private ready: Promise<void>;
+  private gameBusy = false;
+  private fingerprint = "";
+  private reconnectBusy = false;
+  private transport: PartyTransport;
+
   constructor(
     private garage: Garage,
     public changed = () => {},
+    transportOrFactory?:
+      | PartyTransport
+      | ((callbacks: {
+          reply(reply: PartyReply): void;
+          status(connected: boolean): void;
+        }) => PartyTransport),
+    sessionToken?: string,
   ) {
-    try {
-      this.token = sessionStorage.getItem("arena-party-session") ?? "";
-    } catch {
-      /* Isolated in-memory identity if browser storage is disabled. */
+    const callbacks: PartyTransportCallbacks = {
+      reply: (reply: PartyReply) => this.apply(reply),
+      status: (connected: boolean) => {
+        this.connection = connected ? "connected" : "offline";
+        this.changed();
+      },
+    };
+    this.transport =
+      typeof transportOrFactory === "function"
+        ? transportOrFactory(callbacks)
+        : (transportOrFactory ?? new WebRtcPartyTransport(callbacks));
+    if (sessionToken) {
+      this.token = sessionToken;
+    } else {
+      try {
+        this.token = sessionStorage.getItem(TOKEN_KEY) ?? createPartyToken();
+        sessionStorage.setItem(TOKEN_KEY, this.token);
+      } catch {
+        this.token = createPartyToken();
+      }
     }
     this.ready = this.initialize();
     window.setInterval(() => void this.poll(), 2000);
-    window.addEventListener("pagehide", () => {
-      this.stream?.abort();
-      if (this.url && this.connected)
-        void fetch(this.url + "/api/party/disconnect", {
-          method: "POST",
-          credentials: "include",
-          keepalive: true,
-          headers: {
-            "Content-Type": "application/json",
-            "X-Arena-Client": "1",
-            "X-Arena-Party": this.token,
-          },
-          body: "{}",
-        }).catch(() => {});
-    });
+    window.addEventListener("pagehide", () => this.transport.close());
   }
+
   private async initialize() {
+    let code = "";
+    let manual = false;
     try {
-      this.url = (await loadBackendEndpoints()).apiUrl;
-      if (!this.url) return;
-      await this.connect();
-    } catch {
-      /* Local menus remain usable when the configured backend is offline. */
-    }
-  }
-  private apply(reply: PartyReply) {
-    this.playerId = reply.playerId;
-    this.state = reply.party;
-    if (reply.sessionToken) {
-      this.token = reply.sessionToken;
-      try {
-        sessionStorage.setItem("arena-party-session", this.token);
-      } catch {
-        /* Party can still run in this tab. */
+      if (sessionStorage.getItem(ROLE_KEY) === "guest") {
+        code = sessionStorage.getItem(CODE_KEY) ?? "";
+        manual = sessionStorage.getItem(MODE_KEY) === "manual";
       }
-    }
-    if (reply.notice) this.message = reply.notice;
-    this.changed();
-  }
-  private async request(
-    path: string,
-    method = "GET",
-    body?: unknown,
-  ): Promise<PartyReply> {
-    if (!this.url)
-      throw Error("PARTIES ARE NOT CONNECTED — SET THE API ADDRESS");
-    let r: Response;
-    try {
-      r = await fetch(this.url + "/api/party" + path, {
-        method,
-        credentials: "include",
-        headers: {
-          ...(method === "GET"
-            ? {}
-            : { "Content-Type": "application/json", "X-Arena-Client": "1" }),
-          ...(this.token ? { "X-Arena-Party": this.token } : {}),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(7000),
-      });
     } catch {
-      throw Error("PARTY SERVICE UNAVAILABLE");
+      return;
     }
-    const data = await r.json().catch(() => null);
-    if (!r.ok) {
-      if (r.status === 401) {
-        this.connected = false;
+    if (!code) return;
+    if (manual) {
+      this.manualRejoinCode = code;
+      this.message = "MANUAL REJOIN REQUIRED — GENERATE A NEW OFFER CODE";
+      this.changed();
+      return;
+    }
+    try {
+      this.apply(
+        await this.transport.join(
+          code,
+          this.token,
+          this.garage.profile.name,
+          this.garage.current,
+        ),
+      );
+      this.connection = "connected";
+      this.fingerprint = this.signature();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "PARTY RECONNECT FAILED";
+      if (message.includes("PARTY NOT FOUND")) {
+        this.clearStoredParty();
         this.state = null;
-        this.changed();
+        this.message = "HOST LEFT — PARTY ENDED";
+      } else {
+        this.message = message;
       }
-      // Fastify's missing-route response has a string `error`, unlike our
-      // structured application errors. An older running API has no party routes.
-      if (r.status === 404 && data?.error?.code !== "PARTY")
-        throw Error(
-          "PARTY SERVER NEEDS AN UPDATE — RESTART THE BACKEND OR RUN npm run lan",
-        );
-      throw Error(
-        data?.error?.message ??
-          (typeof data?.message === "string"
-            ? data.message
-            : `PARTY REQUEST FAILED (${r.status})`),
+      this.changed();
+    }
+  }
+
+  private apply(reply: PartyReply) {
+    this.playerId = reply.playerId || this.playerId;
+    this.state = reply.party;
+    if (reply.notice) this.message = reply.notice;
+    else if (
+      reply.party &&
+      this.transport.connected &&
+      this.message.startsWith("CONNECTION DROPPED")
+    )
+      this.message = "";
+    if (!reply.party) {
+      this.clearStoredParty();
+      this.manualRejoinCode = "";
+    } else if (reply.playerId === reply.party.hostId) {
+      this.storeParty(
+        reply.party.code,
+        "host",
+        this.transport.manual ? "manual" : "broker",
       );
     }
-    if (!data || typeof data.playerId !== "string" || !("party" in data))
-      throw Error("INVALID PARTY SERVER RESPONSE — CHECK THE API ADDRESS");
-    return data;
+    this.changed();
   }
-  private async connect() {
-    this.apply(
-      await this.request("/session", "POST", {
-        preset: this.garage.current,
-        newSession: !this.token,
-      }),
-    );
-    this.connected = true;
-    this.connection = "connected";
-    this.fingerprint = this.signature();
-    this.openStream();
-  }
-  private openStream() {
-    if (this.stream || !this.connected) return;
-    const controller = new AbortController();
-    this.stream = controller;
-    void (async () => {
-      try {
-        const response = await fetch(this.url + "/api/party/events", {
-          credentials: "include",
-          headers: { "X-Arena-Party": this.token },
-          signal: controller.signal,
-        });
-        if (!response.ok || !response.body) return;
-        const reader = response.body.getReader(),
-          decoder = new TextDecoder();
-        let buffer = "";
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          let end: number;
-          while ((end = buffer.indexOf("\n\n")) >= 0) {
-            const event = buffer.slice(0, end);
-            buffer = buffer.slice(end + 2);
-            if (event.startsWith("data: "))
-              this.apply(JSON.parse(event.slice(6)));
-          }
-        }
-      } catch {
-        // The existing poll reconnects and remains a fallback on older APIs.
-      } finally {
-        if (this.stream === controller) this.stream = null;
-      }
-    })();
-  }
-  private signature() {
-    return JSON.stringify([this.garage.current, this.garage.profile]);
-  }
+
   async action(
     action: keyof PartyActions,
     data: PartyActions[keyof PartyActions] = {},
@@ -173,33 +145,77 @@ export class PartyClient {
     this.changed();
     try {
       await this.ready;
-      if (!this.connected) await this.connect();
-      const path =
-        action === "startMatch"
-          ? "/game/start"
-          : action === "endMatch"
-            ? "/game/end"
-            : "/" + action;
-      this.apply(await this.request(path, "POST", data));
+      let reply: PartyReply;
+      if (action === "create") {
+        reply = await this.transport.create(
+          this.token,
+          this.garage.profile.name,
+          this.garage.current,
+        );
+        this.storeParty(reply.party!.code, "host");
+      } else if (action === "join") {
+        reply = await this.transport.join(
+          (data as PartyActions["join"]).code,
+          this.token,
+          this.garage.profile.name,
+          this.garage.current,
+        );
+        this.storeParty(reply.party!.code, "guest");
+      } else {
+        reply = await this.transport.action(this.token, action, data);
+      }
+      this.apply(reply);
       return true;
-    } catch (e) {
-      this.message = e instanceof Error ? e.message : "PARTY REQUEST FAILED";
+    } catch (error) {
+      this.message =
+        error instanceof Error ? error.message : "PARTY REQUEST FAILED";
       return false;
     } finally {
       this.busy = false;
       this.changed();
     }
   }
+
+  async createManualHost() {
+    await this.ready;
+    const reply = this.transport.createManualHost(
+      this.token,
+      this.garage.profile.name,
+      this.garage.current,
+    );
+    this.storeParty(reply.party!.code, "host", "manual");
+    this.apply(reply);
+    return reply.party!.code;
+  }
+
+  makeManualOffer(code: string) {
+    return this.transport.makeManualOffer(
+      code,
+      this.token,
+      this.garage.profile.name,
+      this.garage.current,
+    );
+  }
+
+  answerManualOffer(offer: string) {
+    return this.transport.answerManualOffer(offer);
+  }
+
+  async acceptManualAnswer(code: string, answer: string) {
+    const reply = await this.transport.acceptManualAnswer(answer);
+    this.storeParty(code, "guest", "manual");
+    this.manualRejoinCode = "";
+    this.message = "";
+    this.apply(reply);
+  }
+
   async sendGameUpdate(input: PlayerInput, snapshot?: MatchSnapshot) {
-    if (this.gameBusy || !this.connected) return false;
+    if (this.gameBusy || !this.connection || !this.state?.game) return false;
     this.gameBusy = true;
     try {
       await this.ready;
       this.apply(
-        await this.request("/game/input", "POST", {
-          input,
-          ...(snapshot ? { snapshot } : {}),
-        }),
+        await this.transport.sendGameUpdate(this.token, input, snapshot),
       );
       return true;
     } catch {
@@ -210,35 +226,110 @@ export class PartyClient {
       this.changed();
     }
   }
+
   private async poll() {
     await this.ready;
-    if (!this.url || this.busy) return;
-    this.busy = true;
-    try {
-      if (!this.connected) await this.connect();
-      this.openStream();
-      const signature = this.signature();
-      const reply =
-        signature !== this.fingerprint
-          ? await this.request("/appearance", "PUT", {
-              preset: this.garage.current,
-            })
-          : await this.request("");
-      this.fingerprint = signature;
-      this.connection = "connected";
-      this.apply(reply);
-      if (this.message === "PARTY CONNECTION LOST — RETRYING")
+    if (this.busy || this.gameBusy) return;
+    if (this.transport.host) {
+      this.transport.sweep();
+      if (this.state && this.signature() !== this.fingerprint) {
+        this.fingerprint = this.signature();
+        try {
+          this.apply(
+            await this.transport.setAppearance(
+              this.token,
+              this.garage.profile.name,
+              this.garage.current,
+            ),
+          );
+        } catch (error) {
+          this.message =
+            error instanceof Error ? error.message : "APPEARANCE UPDATE FAILED";
+        }
+      }
+      return;
+    }
+    if (
+      this.state &&
+      !this.transport.connected &&
+      !this.transport.manual &&
+      !this.reconnectBusy
+    ) {
+      this.reconnectBusy = true;
+      try {
+        await this.transport.join(
+          this.state.code,
+          this.token,
+          this.garage.profile.name,
+          this.garage.current,
+        );
+        this.connection = "connected";
         this.message = "";
-    } catch (e) {
-      this.connection = "offline";
-      if (this.state || this.message)
-        this.message = this.connected
-          ? "PARTY CONNECTION LOST — RETRYING"
-          : (e as Error).message;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("PARTY NOT FOUND")) {
+          this.state = null;
+          this.clearStoredParty();
+          this.message = "HOST LEFT — PARTY ENDED";
+        } else if (message) {
+          this.message = message;
+        }
+      } finally {
+        this.reconnectBusy = false;
+        this.changed();
+      }
+      return;
+    }
+    if (this.state && !this.transport.connected && this.transport.manual) {
+      if (!this.message)
+        this.message = "CONNECTION DROPPED — USE MANUAL CODES TO REJOIN";
       this.changed();
-    } finally {
-      this.busy = false;
-      this.changed();
+    }
+    if (this.state && this.transport.connected) {
+      const signature = this.signature();
+      if (signature !== this.fingerprint) {
+        try {
+          this.apply(
+            await this.transport.setAppearance(
+              this.token,
+              this.garage.profile.name,
+              this.garage.current,
+            ),
+          );
+          this.fingerprint = signature;
+        } catch (error) {
+          this.message =
+            error instanceof Error ? error.message : "APPEARANCE UPDATE FAILED";
+        }
+      }
+    }
+  }
+
+  private signature() {
+    return JSON.stringify([this.garage.current, this.garage.profile]);
+  }
+
+  private storeParty(
+    code: string,
+    role: "host" | "guest",
+    mode: "broker" | "manual" = "broker",
+  ) {
+    try {
+      sessionStorage.setItem(CODE_KEY, code);
+      sessionStorage.setItem(ROLE_KEY, role);
+      sessionStorage.setItem(MODE_KEY, mode);
+    } catch {
+      /* Rejoin state remains in memory for this tab. */
+    }
+  }
+
+  private clearStoredParty() {
+    try {
+      sessionStorage.removeItem(CODE_KEY);
+      sessionStorage.removeItem(ROLE_KEY);
+      sessionStorage.removeItem(MODE_KEY);
+    } catch {
+      /* The in-memory party state is authoritative for this tab. */
     }
   }
 }
