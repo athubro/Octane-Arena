@@ -2,7 +2,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { Vector3, Quaternion } from "three";
 import { P } from "../config/physics";
 import { Car } from "../car/car";
-import { createArena } from "../arena/physics";
+import { createArena, createRingPlatform } from "../arena/physics";
 import { Pose } from "./pose";
 import type { Controls } from "../input/types";
 import {
@@ -23,6 +23,10 @@ export interface Hit {
 }
 export class Simulation {
   world: RAPIER.World;
+  private arenaColliders: RAPIER.Collider[];
+  private ringPlatform: RAPIER.Collider;
+  private ringCourseEnabled = false;
+  private ringSpawn = { x: 0, y: 0.36, z: 51 };
   cars: Car[];
   ball: RAPIER.RigidBody;
   ballCollider: RAPIER.Collider;
@@ -59,7 +63,9 @@ export class Simulation {
     this.world = new RAPIER.World({ x: 0, y: -P.gravity, z: 0 });
     this.world.timestep = P.dt;
     this.world.numSolverIterations = 8;
-    createArena(this.world, flat);
+    this.arenaColliders = createArena(this.world, flat);
+    this.ringPlatform = createRingPlatform(this.world);
+    this.ringPlatform.setCollisionGroups(0);
     this.cars = players.map(() => new Car(this.world));
     this.velocities = players.map(() => new Vector3());
     this.relative = players.map(() => new Vector3());
@@ -95,6 +101,13 @@ export class Simulation {
     this.cars.forEach((c) => c.pose.snap());
     this.ballPose.snap();
   }
+  setRingCourse(enabled: boolean, spawn = { x: 0, y: 0.36, z: 51 }) {
+    this.ringCourseEnabled = enabled;
+    this.ringSpawn = spawn;
+    for (const collider of this.arenaColliders)
+      collider.setCollisionGroups(enabled ? 0 : 0xffffffff);
+    this.ringPlatform.setCollisionGroups(enabled ? 0xffffffff : 0);
+  }
   reset() {
     for (const c of this.cars) {
       if (!c.active) {
@@ -115,11 +128,14 @@ export class Simulation {
       if (!c.active) continue;
       const team = this.cars.filter((p) => p.active && p.team === c.team),
         slot = team.indexOf(c);
-      c.reset(
-        team.length === 1 ? 0 : (slot - (team.length - 1) / 2) * 12,
-        c.team === 0 ? 26 : -26,
-        c.team === 0 ? 0 : Math.PI,
-      );
+      if (this.ringCourseEnabled)
+        c.reset(this.ringSpawn.x, this.ringSpawn.z, 0, this.ringSpawn.y);
+      else
+        c.reset(
+          team.length === 1 ? 0 : (slot - (team.length - 1) / 2) * 12,
+          c.team === 0 ? 26 : -26,
+          c.team === 0 ? 0 : Math.PI,
+        );
     }
     this.ball.setTranslation({ x: 0, y: P.ball.radius + 0.02, z: 0 }, true);
     this.ball.setLinvel({ x: 0, y: 0, z: 0 }, true);

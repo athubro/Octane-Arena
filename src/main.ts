@@ -44,6 +44,7 @@ import { PadRecharge } from "./render/pad-recharge";
 import { DemolitionFlash } from "./effects/demolition-flash";
 import { RingChallenge } from "./game/ring-challenge";
 import { RingCourseView } from "./render/ring-course";
+import { RingMap } from "./render/ring-map";
 import type {
   MatchSnapshot,
   PartyGame,
@@ -104,6 +105,7 @@ async function boot() {
   scene.add(sun);
   const arena = drawArena(scene);
   const ringCourse = new RingCourseView(scene, ringChallenge);
+  const ringMap = new RingMap(scene);
   const visuals = [
     carModel(
       new T.Color(garage.current.blue).getHex(),
@@ -271,6 +273,9 @@ async function boot() {
         : "bot",
   ) => {
     ui.modes(false);
+    simulation.setRingCourse(mode === "rings", RingChallenge.startingPosition);
+    arena.setVisible(mode !== "rings");
+    ringMap.setVisible(mode === "rings");
     resetEffects();
     audio.unlock();
     input.clear();
@@ -344,6 +349,9 @@ async function boot() {
     input.clear();
     resetEffects();
     ui.modes(false);
+    simulation.setRingCourse(false);
+    arena.setVisible(true);
+    ringMap.setVisible(false);
     match.start(simulation, "party");
     arena.setNeutral(false);
     goalPlanes.setNeutral(false);
@@ -367,6 +375,9 @@ async function boot() {
     ui.modes(false);
     resetEffects();
     match.phase = "home";
+    simulation.setRingCourse(false);
+    arena.setVisible(true);
+    ringMap.setVisible(false);
     arena.setNeutral(false);
     goalPlanes.setNeutral(false);
     simulation.reset();
@@ -524,6 +535,7 @@ async function boot() {
     const dt = Math.min((now - previous) / 1000, 0.1);
     previous = now;
     ringCourse.setVisible(match.mode === "rings" && match.phase !== "home");
+    for (const pad of padMeshes) pad.visible = match.mode !== "rings";
     const controls = input.sample();
     const networkGame = party.state?.game ?? null;
     const partyInputs = () => {

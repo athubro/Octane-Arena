@@ -24,7 +24,10 @@ function turfTexture() {
   return t;
 }
 export function drawArena(scene: T.Scene) {
-  const teamMaterials: { material: T.MeshBasicMaterial | T.LineBasicMaterial; color: number }[] = [];
+  const teamMaterials: {
+    material: T.MeshBasicMaterial | T.LineBasicMaterial;
+    color: number;
+  }[] = [];
   const a = P.arena,
     group = new T.Group();
   scene.add(group);
@@ -195,7 +198,8 @@ export function drawArena(scene: T.Scene) {
       opacity: 0.23,
     });
     const marking = new T.LineBasicMaterial({ color });
-    for (const material of [glow, net, marking]) teamMaterials.push({ material, color });
+    for (const material of [glow, net, marking])
+      teamMaterials.push({ material, color });
     for (let x = -a.goalHalf; x <= a.goalHalf; x += 0.65)
       line(
         [
@@ -260,8 +264,11 @@ export function drawArena(scene: T.Scene) {
     line([new T.Vector3(x, 20.4, -48), new T.Vector3(x, 20.4, 48)], gridMat);
   for (let z = -48; z <= 48; z += 6)
     line([new T.Vector3(-38, 20.4, z), new T.Vector3(38, 20.4, z)], gridMat);
-  drawCity(scene);
+  drawCity(group);
   return {
+    setVisible(visible: boolean) {
+      group.visible = visible;
+    },
     setNeutral(neutral: boolean) {
       for (const entry of teamMaterials)
         entry.material.color.setHex(neutral ? 0xa8a8a8 : entry.color);
@@ -270,7 +277,7 @@ export function drawArena(scene: T.Scene) {
 }
 
 /** Lumen District: original terraced towers, lit windows and elevated skybridges. */
-function drawCity(scene: T.Scene) {
+function drawCity(scene: T.Object3D) {
   const city = new T.Group();
   scene.add(city);
   const concrete = material(0x243343, 0.5, 0.7),
@@ -344,5 +351,5 @@ function drawCity(scene: T.Scene) {
     new T.MeshBasicMaterial({ color: 0xffdfb0 }),
   );
   moon.position.set(-65, 75, -130);
-  scene.add(moon);
+  city.add(moon);
 }

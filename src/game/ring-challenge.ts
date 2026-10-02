@@ -1,17 +1,17 @@
 import { Vector3 } from "three";
 
 const course = [
-  new Vector3(0, 5, 15),
-  new Vector3(-8, 6, 5),
-  new Vector3(-17, 8, -7),
-  new Vector3(-14, 10, -22),
-  new Vector3(-3, 9, -33),
-  new Vector3(11, 7, -25),
-  new Vector3(19, 8, -9),
-  new Vector3(13, 10, 7),
-  new Vector3(3, 8, 20),
+  new Vector3(0, 3, 20),
+  new Vector3(2, 3.5, 6),
+  new Vector3(4, 4, -8),
+  new Vector3(2, 4.5, -22),
+  new Vector3(0, 5, -36),
+  new Vector3(-2, 5.5, -50),
+  new Vector3(-4, 5, -64),
+  new Vector3(-2, 4.5, -78),
+  new Vector3(0, 4, -92),
 ];
-const spawn = new Vector3(0, 0.36, 26);
+const spawn = new Vector3(0, 0.36, 51);
 const openingRadius = 2.55;
 const recordKey = "octane-arena-ring-streak-v1";
 
