@@ -29,7 +29,8 @@ export function carModel(
 ) {
   const g = new T.Group(),
     d = bodies[bodyId],
-    rally = bodyId === "vector";
+    rally = bodyId === "vector",
+    coupe = bodyId === "riptide";
   const paint = material(color, 0.4, 0.42),
     dark = material(0x101c25, 0.45, 0.4),
     glass = material(0x446778, 0.7, 0.28);
@@ -48,22 +49,32 @@ export function carModel(
           [L / 2 - 0.02, 0.085],
           [L / 2 - 0.02, -0.125],
         ]
-      : [
-          [-L / 2 + 0.02, -0.125],
-          [-L / 2 + 0.02, -0.015],
-          [-L * 0.4, 0.045],
-          [L * 0.4, 0.045],
-          [L / 2 - 0.02, -0.005],
-          [L / 2 - 0.02, -0.125],
-        ],
+      : coupe
+        ? [
+            [-L / 2 + 0.02, -0.125],
+            [-L / 2 + 0.02, -0.055],
+            [-L * 0.34, 0.045],
+            [-L * 0.16, 0.115],
+            [L * 0.24, 0.105],
+            [L / 2 - 0.02, 0.015],
+            [L / 2 - 0.02, -0.125],
+          ]
+        : [
+            [-L / 2 + 0.02, -0.125],
+            [-L / 2 + 0.02, -0.015],
+            [-L * 0.4, 0.045],
+            [L * 0.4, 0.045],
+            [L / 2 - 0.02, -0.005],
+            [L / 2 - 0.02, -0.125],
+          ],
     paint,
   );
   g.add(hull);
-  const hoodY = rally ? 0.15 : 0.07,
-    hoodLength = L * (rally ? 0.27 : 0.4),
-    hoodZ = -L * (rally ? 0.335 : 0.275),
-    roofLength = L * (rally ? 0.49 : 0.39),
-    roofZ = L * (rally ? 0.085 : 0.1);
+  const hoodY = rally ? 0.15 : coupe ? 0.105 : 0.07,
+    hoodLength = L * (rally ? 0.27 : coupe ? 0.36 : 0.4),
+    hoodZ = -L * (rally ? 0.335 : coupe ? 0.3 : 0.275),
+    roofLength = L * (rally ? 0.49 : coupe ? 0.37 : 0.39),
+    roofZ = L * (rally ? 0.085 : coupe ? 0.12 : 0.1);
   box(g, [W - 0.17, 0.07, hoodLength], [0, hoodY, hoodZ], paint);
   g.add(
     profileMesh(
@@ -75,26 +86,33 @@ export function carModel(
             [L * 0.33, roof - 0.032],
             [L * 0.4, 0.135],
           ]
-        : [
-            [-L * 0.2, 0.07],
-            [-L * 0.095, roof - 0.032],
-            [L * 0.29, roof - 0.032],
-            [L * 0.36, 0.07],
-          ],
+        : coupe
+          ? [
+              [-L * 0.24, 0.09],
+              [-L * 0.11, roof - 0.04],
+              [L * 0.17, roof - 0.04],
+              [L * 0.34, 0.07],
+            ]
+          : [
+              [-L * 0.2, 0.07],
+              [-L * 0.095, roof - 0.032],
+              [L * 0.29, roof - 0.032],
+              [L * 0.36, 0.07],
+            ],
       glass,
     ),
   );
   box(
     g,
-    [W - (rally ? 0.14 : 0.22), 0.025, roofLength],
+    [W - (rally ? 0.14 : coupe ? 0.18 : 0.22), 0.025, roofLength],
     [0, roof - 0.0125, roofZ],
     paint,
   );
   box(g, [W, 0.045, 0.07], [0, -0.025, -L / 2], dark);
   box(
     g,
-    [W - (rally ? 0.12 : 0.01), 0.045, 0.09],
-    [0, roof - 0.025, L * (rally ? 0.35 : 0.44)],
+    [W - (rally ? 0.12 : coupe ? 0.16 : 0.01), 0.045, 0.09],
+    [0, roof - 0.025, L * (rally ? 0.35 : coupe ? 0.38 : 0.44)],
     dark,
   );
   if (rally) {
@@ -130,6 +148,17 @@ export function carModel(
         flare.position.set(side * (W / 2 - 0.025), -0.025, end * d.axle);
         g.add(flare);
       }
+  } else if (coupe) {
+    // Fastback coupe styling stays within the body hitbox.
+    for (const side of [-1, 1]) {
+      box(
+        g,
+        [0.026, 0.12, L * 0.26],
+        [side * (W * 0.37), roof - 0.09, L * 0.1],
+        paint,
+      );
+      box(g, [0.06, 0.025, 0.19], [side * (W * 0.36), 0.045, -L * 0.3], dark);
+    }
   }
   for (const sign of [-1, 1]) {
     box(

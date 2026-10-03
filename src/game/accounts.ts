@@ -239,7 +239,7 @@ export class Accounts {
   }
   private render() {
     const a = this.account;
-    this.dialog.innerHTML = `<div class="dialog-heading"><h2>${a ? "PROFILE" : "ACCOUNT"}</h2><button class="icon-button" id="account-close" aria-label="Close account">×</button></div><div class="account-body">${a ? `<div class="account-identity"><div class="avatar">${icon(a.avatarId)}</div><div><h3 id="account-name"></h3><p>LEVEL ${a.level} · ${a.xp} XP</p></div></div><h3>AVATAR</h3><div class="avatar-grid">${avatars.map((v) => `<button data-avatar="${v.id}" aria-label="${v.name}" aria-pressed="${a.avatarId === v.id}">${icon(v.id)}</button>`).join("")}</div><h3>TITLE</h3><div class="title-grid">${titles.map((t) => `<button data-title="${t.id}" ${a.owned.title?.includes(t.id) ? "" : "disabled"} aria-pressed="${a.titleId === t.id}">${t.name}${t.level > 1 ? ` <small>LV ${t.level}</small>` : ""}</button>`).join("")}</div><div class="account-actions"><button id="account-retry" class="small-button">RETRY SAVE</button><button id="account-reload" class="small-button">LOAD CLOUD SAVE</button><button id="account-logout" class="small-button">LOG OUT</button></div><div id="reload-confirm" hidden><p>Replace unsaved changes with the latest cloud save?</p><button id="reload-yes" class="small-button">LOAD SAVE</button><button id="reload-no" class="small-button">CANCEL</button></div>` : `<nav class="settings-tabs"><button data-auth="login" aria-pressed="${this.formMode === "login"}">LOG IN</button><button data-auth="register" aria-pressed="${this.formMode === "register"}">CREATE ACCOUNT</button></nav><form id="account-form"><label for="username">USERNAME</label><input id="username" name="username" autocomplete="username" minlength="5" maxlength="20" pattern="[A-Za-z0-9_]+" required spellcheck="false"><label for="password">PASSWORD</label><input id="password" name="password" type="password" autocomplete="${this.formMode === "login" ? "current-password" : "new-password"}" minlength="8" maxlength="128" required>${this.formMode === "register" ? '<p class="field-note">Username: 5–20 letters, numbers or underscores. Password: 8–128 characters.</p>' : ""}<button class="nav-button primary" type="submit" ${this.ready && this.url ? "" : "disabled"}>${this.formMode === "login" ? "LOG IN" : "CREATE ACCOUNT"}</button></form><p class="field-note">${this.ready ? (this.url ? "Your Guest garage stays on this device." : "Accounts are not connected yet. Continue playing as Guest.") : "Connecting…"}</p>`}<p id="account-status" role="status"></p></div>`;
+    this.dialog.innerHTML = `<div class="dialog-heading"><h2>${a ? "PROFILE" : "ACCOUNT"}</h2><button class="icon-button" id="account-close" aria-label="Close account">×</button></div><div class="account-body">${a ? `<div class="account-identity"><div class="avatar">${icon(a.avatarId)}</div><div><h3 id="account-name"></h3><p>LEVEL ${a.level} · ${a.xp} XP</p></div></div><h3>AVATAR</h3><div class="avatar-grid">${avatars.map((v) => `<button data-avatar="${v.id}" aria-label="${v.name}" aria-pressed="${a.avatarId === v.id}">${icon(v.id)}</button>`).join("")}</div><h3>TITLE</h3><div class="title-grid">${titles.map((t) => `<button data-title="${t.id}" ${a.owned.title?.includes(t.id) ? "" : "disabled"} aria-pressed="${a.titleId === t.id}">${t.name}${t.level > 1 ? ` <small>LV ${t.level}</small>` : ""}</button>`).join("")}</div><div class="account-actions"><button id="account-retry" class="small-button">RETRY SAVE</button><button id="account-reload" class="small-button">LOAD CLOUD SAVE</button><button id="account-logout" class="small-button">LOG OUT</button></div><div id="reload-confirm" hidden><p>Replace unsaved changes with the latest cloud save?</p><button id="reload-yes" class="small-button">LOAD SAVE</button><button id="reload-no" class="small-button">CANCEL</button></div>` : `<form id="guest-profile-form"><label for="guest-display-name">PLAYER NAME</label><input id="guest-display-name" maxlength="24" pattern="[A-Za-z0-9 _-]{1,24}" autocomplete="nickname" required><button class="small-button" type="submit">SAVE NAME TO COOKIES</button></form><nav class="settings-tabs"><button data-auth="login" aria-pressed="${this.formMode === "login"}">LOG IN</button><button data-auth="register" aria-pressed="${this.formMode === "register"}">CREATE ACCOUNT</button></nav><form id="account-form"><label for="username">ACCOUNT USERNAME</label><input id="username" name="username" autocomplete="username" minlength="5" maxlength="20" pattern="[A-Za-z0-9_]+" required spellcheck="false"><label for="password">PASSWORD</label><input id="password" name="password" type="password" autocomplete="${this.formMode === "login" ? "current-password" : "new-password"}" minlength="8" maxlength="128" required>${this.formMode === "register" ? '<p class="field-note">Username: 5–20 letters, numbers or underscores. Password: 8–128 characters.</p>' : ""}<button class="nav-button primary" type="submit" ${this.ready && this.url ? "" : "disabled"}>${this.formMode === "login" ? "LOG IN" : "CREATE ACCOUNT"}</button></form><p class="field-note">${this.ready ? (this.url ? "Your Guest garage stays on this device." : "Accounts are not connected yet. Continue playing as Guest.") : "Connecting…"}</p>`}<p id="account-status" role="status"></p></div>`;
     this.updateStatus();
     this.dialog
       .querySelector("#account-close")!
@@ -308,6 +308,24 @@ export class Accounts {
           }),
       );
     } else {
+      const displayName = this.dialog.querySelector<HTMLInputElement>(
+        "#guest-display-name",
+      )!;
+      displayName.value = this.garage.profile.name;
+      this.dialog.querySelector<HTMLFormElement>(
+        "#guest-profile-form",
+      )!.onsubmit = (e) => {
+        e.preventDefault();
+        if (!this.garage.setDisplayName(displayName.value)) {
+          this.status =
+            "Enter 1–24 letters, numbers, spaces, underscores or hyphens. Cookies must be enabled.";
+          this.updateStatus();
+          return;
+        }
+        this.status = "Player name saved to this browser’s cookies.";
+        this.changed();
+        this.updateStatus();
+      };
       this.dialog.querySelectorAll<HTMLButtonElement>("[data-auth]").forEach(
         (b) =>
           (b.onclick = () => {

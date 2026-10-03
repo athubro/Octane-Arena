@@ -50,6 +50,33 @@ export class Garage {
     } catch {
       /* A corrupt or unavailable save never prevents playing. */
     }
+    this.profile.name = this.readDisplayName();
+  }
+  private readDisplayName() {
+    try {
+      const value = document.cookie
+        .split(";")
+        .map((entry) => entry.trim())
+        .find((entry) => entry.startsWith("octane-arena-display-name="))
+        ?.slice("octane-arena-display-name=".length);
+      const name = value ? decodeURIComponent(value).trim() : "";
+      return /^[A-Za-z0-9 _-]{1,24}$/.test(name) ? name : "Guest";
+    } catch {
+      return "Guest";
+    }
+  }
+  setDisplayName(value: string) {
+    const name = value.trim();
+    if (!/^[A-Za-z0-9 _-]{1,24}$/.test(name)) return false;
+    try {
+      const secure = location.protocol === "https:" ? "; Secure" : "";
+      document.cookie = `octane-arena-display-name=${encodeURIComponent(name)}; Max-Age=31536000; Path=/; SameSite=Lax${secure}`;
+    } catch {
+      return false;
+    }
+    if (this.readDisplayName() !== name) return false;
+    this.profile.name = name;
+    return true;
   }
   get current() {
     return this.presets.find((p) => p.id === this.selected) ?? this.presets[0];

@@ -50,7 +50,7 @@ export const presetSchema = z
       .min(1)
       .max(32)
       .regex(/^[A-Za-z0-9 _-]+$/),
-    body: z.enum(["ion", "vector"]),
+    body: z.enum(["ion", "vector", "riptide"]),
     blue: z
       .string()
       .refine((v) => palette.includes(v), "Choose a palette color."),

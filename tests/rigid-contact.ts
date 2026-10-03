@@ -47,7 +47,7 @@ function orient(s: Simulation, p: Vector3, up: Vector3, forward: Vector3) {
   );
   s.world.step();
 }
-for (const id of ["ion", "vector"] as const) {
+for (const id of ["ion", "vector", "riptide"] as const) {
   for (const mode of [
     "stationary",
     "accelerate",
@@ -273,7 +273,7 @@ check("ceiling drive then loss of contact falls freely", () => {
   assert.ok(!c.grounded && c.body.translation().y < P.arena.height - 2);
   s.dispose();
 });
-for (const id of ["ion", "vector"] as const)
+for (const id of ["ion", "vector", "riptide"] as const)
   for (const sign of [-1, 1])
     check(`${id} goal interior curve ${sign}`, () => {
       const s = fixture(),
@@ -345,4 +345,19 @@ for (const id of ["ion", "vector"] as const)
       s.dispose();
       return { min, samples, supported };
     });
+check(
+  "field escape recovery returns cars and ball without resetting boost",
+  () => {
+    const s = fixture(),
+      c = s.cars[0];
+    c.boost = 57;
+    c.body.setTranslation({ x: P.arena.halfWidth + 3, y: 3, z: 0 }, true);
+    s.ball.setTranslation({ x: 0, y: -4, z: 0 }, true);
+    step(s);
+    assert.ok(Math.abs(c.body.translation().x) < 0.01);
+    assert.ok(c.boost === 57);
+    assert.ok(s.ball.translation().y > P.ball.radius);
+    s.dispose();
+  },
+);
 if (failed) process.exitCode = 1;

@@ -45,6 +45,7 @@ export class Simulation {
   private cooldown: number[] = [];
   private relative: Vector3[] = [];
   configuredCount: number;
+  private readonly flatArena: boolean;
   constructor(
     flat = false,
     players: PlayerEntity[] = [
@@ -52,6 +53,7 @@ export class Simulation {
       { id: "bot", name: "Rival", team: 1, controller: "bot" },
     ],
   ) {
+    this.flatArena = flat;
     if (
       players.length < 1 ||
       players.length > 4 ||
@@ -395,6 +397,42 @@ export class Simulation {
       c.pose.after();
     });
     this.ballPose.after();
+    if (!this.ringCourseEnabled && !this.flatArena) this.recoverEscapedBodies();
+  }
+  private recoverEscapedBodies() {
+    const a = P.arena,
+      carLimitX = a.halfWidth + 1,
+      carLimitZ = a.halfLength + a.goalDepth + 1,
+      ballLimitZ = a.halfLength + a.goalDepth + P.ball.radius;
+    for (const car of this.cars) {
+      if (!car.active || !car.body.isEnabled()) continue;
+      const p = car.body.translation();
+      if (
+        p.y >= -2.5 &&
+        Math.abs(p.x) <= carLimitX &&
+        Math.abs(p.z) <= carLimitZ
+      )
+        continue;
+      const boost = car.boost,
+        team = this.cars.filter(
+          (other) => other.active && other.team === car.team,
+        ),
+        slot = team.indexOf(car);
+      car.reset(
+        team.length === 1 ? 0 : (slot - (team.length - 1) / 2) * 12,
+        car.team === 0 ? 26 : -26,
+        car.team === 0 ? 0 : Math.PI,
+      );
+      car.boost = boost;
+    }
+    const p = this.ball.translation();
+    if (p.y < -2.5 || Math.abs(p.x) > carLimitX || Math.abs(p.z) > ballLimitZ) {
+      this.ball.setTranslation({ x: 0, y: P.ball.radius + 0.02, z: 0 }, true);
+      this.ball.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+      this.ball.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      this.ball.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      this.ballPose.snap();
+    }
   }
   private strike(i: number) {
     if (this.cooldown[i] > 0) return;

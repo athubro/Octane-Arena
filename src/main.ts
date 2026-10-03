@@ -246,6 +246,7 @@ async function boot() {
     lastRemoteSnapshotAt = 0,
     networkSequence = 0,
     lastNetworkSend = 0;
+  let pendingPartyJump = false;
   const leaveDialog = document.createElement("dialog");
   leaveDialog.id = "leave-confirm";
   leaveDialog.setAttribute("aria-labelledby", "leave-title");
@@ -346,6 +347,7 @@ async function boot() {
     lastRemoteSnapshot = -1;
     lastRemoteSnapshotAt = 0;
     networkSequence = 0;
+    pendingPartyJump = false;
     input.clear();
     resetEffects();
     ui.modes(false);
@@ -538,6 +540,11 @@ async function boot() {
     for (const pad of padMeshes) pad.visible = match.mode !== "rings";
     const controls = input.sample();
     const networkGame = party.state?.game ?? null;
+    const remotePartyInput =
+      match.mode === "party" &&
+      activePartyGameId !== null &&
+      party.state?.hostId !== party.playerId;
+    if (remotePartyInput && input.takeAction("jump")) pendingPartyJump = true;
     const partyInputs = () => {
       const inputs = new Map<string, PlayerInput>();
       for (const [i, car] of simulation.cars.entries()) {
@@ -786,12 +793,18 @@ async function boot() {
       Date.now() - lastNetworkSend >= 50
     ) {
       lastNetworkSend = Date.now();
-      void party.sendGameUpdate(
-        controls,
-        party.state?.hostId === party.playerId
-          ? makeNetworkSnapshot()
-          : undefined,
-      );
+      void party
+        .sendGameUpdate(
+          remotePartyInput && pendingPartyJump
+            ? { ...controls, jump: true }
+            : controls,
+          party.state?.hostId === party.playerId
+            ? makeNetworkSnapshot()
+            : undefined,
+        )
+        .then((sent) => {
+          if (sent && remotePartyInput) pendingPartyJump = false;
+        });
     }
     simulation.cars.forEach((c, i) => {
       c.pose.render(cars[i], alpha);

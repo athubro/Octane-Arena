@@ -21,12 +21,21 @@ export const bodies = {
     hitboxY: 0.13, // Raise the roof while preserving the existing underside clearance.
     axle: 0.49,
   },
+  riptide: {
+    name: "Riptide",
+    halfWidth: 0.43,
+    halfHeight: 0.22,
+    halfLength: 0.64,
+    hitboxY: 0.1,
+    axle: 0.47,
+  },
 } as const;
 export type BodyId = keyof typeof bodies;
 export const inventory = {
   body: [
     { id: "ion", name: "Ion" },
     { id: "vector", name: "Vector" },
+    { id: "riptide", name: "Riptide" },
   ],
   wheels: [
     { id: "apex", name: "Apex" },

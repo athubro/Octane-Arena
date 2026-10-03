@@ -9,13 +9,40 @@ function turfTexture() {
   ctx.fillStyle = "#154e47";
   ctx.fillRect(0, 0, 512, 512);
   let seed = 73;
-  for (let i = 0; i < 40000; i++) {
+  const random = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
-    const x = seed % 512;
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    const y = seed % 512;
-    ctx.fillStyle = i % 2 ? "#205a4c" : "#103f3e";
-    ctx.fillRect(x, y, 1, 3);
+    return seed / 0x100000000;
+  };
+  for (let i = 0; i < 190; i++) {
+    const x = random() * 512,
+      y = random() * 512,
+      radius = 12 + random() * 28;
+    ctx.fillStyle = i % 2 ? "rgba(76, 141, 91, 0.12)" : "rgba(6, 35, 38, 0.14)";
+    ctx.beginPath();
+    ctx.ellipse(x, y, radius * 1.5, radius, random() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = 0; i < 8500; i++) {
+    const x = random() * 512,
+      y = random() * 512,
+      bladeHeight = 2 + random() * 5,
+      lean = (random() - 0.5) * 3;
+    const light = random() > 0.52;
+    ctx.strokeStyle = light
+      ? "rgba(112, 168, 105, 0.38)"
+      : "rgba(2, 35, 37, 0.42)";
+    ctx.lineWidth = 0.6 + random() * 0.9;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + lean, y - bladeHeight);
+    ctx.stroke();
+  }
+  for (let i = 0; i < 2200; i++) {
+    const x = random() * 512,
+      y = random() * 512;
+    ctx.fillStyle =
+      i % 2 ? "rgba(159, 184, 106, 0.22)" : "rgba(1, 25, 31, 0.28)";
+    ctx.fillRect(x, y, 1, 1);
   }
   const t = new T.CanvasTexture(c);
   t.wrapS = t.wrapT = T.RepeatWrapping;
