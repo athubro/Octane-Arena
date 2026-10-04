@@ -198,7 +198,7 @@ test("WebRTC authority starts and relays host-owned match state and inputs", () 
     pitch: 0,
     yaw: 0,
     roll: 0,
-    jump: false,
+    jump: true,
     boost: false,
     slide: false,
   };

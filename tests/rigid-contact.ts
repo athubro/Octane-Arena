@@ -224,6 +224,32 @@ for (const wall of [false, true])
     s.dispose();
     return { separation };
   });
+check("high-speed side-wall impact keeps cars inside the arena", () => {
+  const s = fixture(),
+    c = s.cars[0];
+  c.reset(P.arena.halfWidth - 2, 0, 0, 10);
+  c.body.setLinvel({ x: 23, y: 0, z: 0 }, true);
+  for (let i = 0; i < 40; i++) {
+    s.step([neutral(), neutral()]);
+    assert.ok(
+      Math.abs(c.body.translation().x) <= P.arena.halfWidth + 0.25,
+      `car escaped to x=${c.body.translation().x}`,
+    );
+  }
+  const x = c.body.translation().x;
+  s.dispose();
+  return { x };
+});
+check("cars already outside a side wall are returned inside the arena", () => {
+  const s = fixture(),
+    c = s.cars[0];
+  c.body.setTranslation({ x: P.arena.halfWidth + 0.5, y: 10, z: 0 }, true);
+  s.step([neutral(), neutral()]);
+  const x = c.body.translation().x;
+  assert.ok(Math.abs(x) <= P.arena.halfWidth + 0.25, `car escaped to x=${x}`);
+  s.dispose();
+  return { x };
+});
 for (const sideways of [false, true])
   check(
     `aerial landing ${sideways ? "sideways powerslide" : "straight"}`,

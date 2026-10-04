@@ -160,7 +160,7 @@ function grassGeometry(
         sideX = Math.cos(angle),
         sideZ = Math.sin(angle),
         width = 0.025 + random() * 0.04,
-        height = 0.14 + random() * 0.22,
+        height = 0.07 + random() * 0.09,
         leanX = (random() - 0.5) * 0.12,
         leanZ = (random() - 0.5) * 0.12,
         phase = random() * Math.PI * 2,
@@ -228,7 +228,7 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
         varying vec3 vColor;
         varying float vHeight;
         void main() {
-          float heightAlong = clamp(position.y / 0.36, 0.0, 1.0);
+          float heightAlong = clamp(position.y / 0.16, 0.0, 1.0);
           vec2 sway = vec2(
             sin(uTime * 1.8 + aPhase + aRoot.x * 0.17),
             cos(uTime * 1.35 + aPhase + aRoot.z * 0.14)
@@ -279,7 +279,12 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
     floorMaterial.bumpMap = next === "ultra" ? detailedTurf!.bumpMap : null;
     floorMaterial.bumpScale = next === "ultra" ? 0.018 : 0;
     floorMaterial.needsUpdate = true;
-    const grassCounts = { low: 9000, medium: 16000, high: 26000, ultra: 38000 };
+    const grassCounts = {
+      low: 24000,
+      medium: 42000,
+      high: 70000,
+      ultra: 95000,
+    };
     grass.geometry.dispose();
     grass.geometry = grassGeometry(
       a.halfWidth - 0.8,

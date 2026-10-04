@@ -248,7 +248,8 @@ async function boot() {
     lastRemoteSnapshotAt = 0,
     networkSequence = 0,
     lastNetworkSend = 0;
-  let pendingPartyJump = false;
+  let pendingPartyJumpUntil = 0,
+    partyJumpWasDown = false;
   const leaveDialog = document.createElement("dialog");
   leaveDialog.id = "leave-confirm";
   leaveDialog.setAttribute("aria-labelledby", "leave-title");
@@ -349,7 +350,8 @@ async function boot() {
     lastRemoteSnapshot = -1;
     lastRemoteSnapshotAt = 0;
     networkSequence = 0;
-    pendingPartyJump = false;
+    pendingPartyJumpUntil = 0;
+    partyJumpWasDown = false;
     input.clear();
     resetEffects();
     ui.modes(false);
@@ -546,7 +548,9 @@ async function boot() {
       match.mode === "party" &&
       activePartyGameId !== null &&
       party.state?.hostId !== party.playerId;
-    if (remotePartyInput && input.takeAction("jump")) pendingPartyJump = true;
+    if (remotePartyInput && controls.jump && !partyJumpWasDown)
+      pendingPartyJumpUntil = now + 200;
+    partyJumpWasDown = controls.jump;
     const partyInputs = () => {
       const inputs = new Map<string, PlayerInput>();
       for (const [i, car] of simulation.cars.entries()) {
@@ -795,18 +799,14 @@ async function boot() {
       Date.now() - lastNetworkSend >= 50
     ) {
       lastNetworkSend = Date.now();
-      void party
-        .sendGameUpdate(
-          remotePartyInput && pendingPartyJump
-            ? { ...controls, jump: true }
-            : controls,
-          party.state?.hostId === party.playerId
-            ? makeNetworkSnapshot()
-            : undefined,
-        )
-        .then((sent) => {
-          if (sent && remotePartyInput) pendingPartyJump = false;
-        });
+      void party.sendGameUpdate(
+        remotePartyInput && pendingPartyJumpUntil > now
+          ? { ...controls, jump: true }
+          : controls,
+        party.state?.hostId === party.playerId
+          ? makeNetworkSnapshot()
+          : undefined,
+      );
     }
     simulation.cars.forEach((c, i) => {
       c.pose.render(cars[i], alpha);
