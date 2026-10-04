@@ -401,9 +401,9 @@ export class Simulation {
   }
   private recoverEscapedBodies() {
     const a = P.arena,
-      carLimitX = a.halfWidth + 0.25,
-      carLimitZ = a.halfLength + a.goalDepth + 0.25,
-      ballLimitZ = a.halfLength + a.goalDepth + P.ball.radius;
+      carLimitX = a.halfWidth + 0.05,
+      carLimitZ = a.halfLength + a.goalDepth + 0.05,
+      ballLimitZ = a.halfLength + a.goalDepth - P.ball.radius;
     for (const car of this.cars) {
       if (!car.active || !car.body.isEnabled()) continue;
       const p = car.body.translation();

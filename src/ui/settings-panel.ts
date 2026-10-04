@@ -197,7 +197,7 @@ export class SettingsPanel {
         this.render();
       });
     } else if (this.tab === "graphics") {
-      host.innerHTML = `<div class="quality-grid">${["low", "medium", "high", "ultra"].map((q) => `<button data-quality="${q}" aria-pressed="${p.quality === q}">${q.toUpperCase()}</button>`).join("")}</div><dl class="quality-info"><dt>Resolution</dt><dd>${{ low: "65%", medium: "85%", high: "100%", ultra: "130%" }[p.quality]}</dd><dt>Shadows</dt><dd>${{ low: "OFF", medium: "1024", high: "2048", ultra: "4096" }[p.quality]}</dd><dt>Particles</dt><dd>${{ low: "20%", medium: "50%", high: "100%", ultra: "150%" }[p.quality]}</dd><dt>Edge smoothing</dt><dd>${p.quality === "low" ? "OFF" : "FXAA"}</dd><dt>Grass texture</dt><dd>${p.quality === "ultra" ? "2K + BUMP" : "STANDARD"}</dd></dl>`;
+      host.innerHTML = `<div class="quality-grid">${["low", "medium", "high", "ultra"].map((q) => `<button data-quality="${q}" aria-pressed="${p.quality === q}">${q.toUpperCase()}</button>`).join("")}</div><dl class="quality-info"><dt>Resolution</dt><dd>${{ low: "65%", medium: "85%", high: "100%", ultra: "130%" }[p.quality]}</dd><dt>Shadows</dt><dd>${{ low: "OFF", medium: "1024", high: "2048", ultra: "4096" }[p.quality]}</dd><dt>Particles</dt><dd>${{ low: "20%", medium: "50%", high: "100%", ultra: "150%" }[p.quality]}</dd><dt>Edge smoothing</dt><dd>${p.quality === "low" ? "OFF" : "FXAA"}</dd><dt>Turf detail</dt><dd>${p.quality === "ultra" ? "2K + BUMP" : "STANDARD"}</dd><dt>Building finish</dt><dd>${p.quality === "ultra" ? "PBR + GLASS" : "STANDARD"}</dd><dt>Reflections</dt><dd>${p.quality === "ultra" ? "IMAGE-BASED" : "OFF"}</dd></dl>`;
       host.querySelectorAll<HTMLButtonElement>("[data-quality]").forEach(
         (b) =>
           (b.onclick = () => {

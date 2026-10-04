@@ -4,6 +4,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { qualities, type Quality } from "../game/settings";
 export class Graphics {
   quality: Quality = "high";
@@ -11,14 +12,15 @@ export class Graphics {
   private composer: EffectComposer;
   private renderPass: RenderPass;
   private aa = new ShaderPass(FXAAShader);
+  private environment: T.Texture | null = null;
   constructor(
     public renderer: T.WebGLRenderer,
-    scene: T.Scene,
+    private scene: T.Scene,
     camera: T.Camera,
     private sun: T.DirectionalLight,
   ) {
     this.composer = new EffectComposer(renderer);
-    this.renderPass = new RenderPass(scene, camera);
+    this.renderPass = new RenderPass(this.scene, camera);
     this.composer.addPass(this.renderPass);
     this.composer.addPass(new OutputPass());
     this.composer.addPass(this.aa);
@@ -28,6 +30,20 @@ export class Graphics {
     this.applied = quality;
     this.quality = quality;
     const q = qualities[quality];
+    if (quality === "ultra") {
+      if (!this.environment) {
+        const room = new RoomEnvironment(),
+          pmrem = new T.PMREMGenerator(this.renderer);
+        this.environment = pmrem.fromScene(room, 0.04).texture;
+        room.dispose();
+        pmrem.dispose();
+      }
+      this.scene.environment = this.environment;
+      this.scene.environmentIntensity = 0.8;
+    } else {
+      this.scene.environment = null;
+      this.scene.environmentIntensity = 1;
+    }
     this.renderer.shadowMap.enabled = q.shadows > 0;
     if (this.sun.shadow.mapSize.x !== q.shadows && q.shadows) {
       this.sun.shadow.mapSize.set(q.shadows, q.shadows);

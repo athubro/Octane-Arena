@@ -549,7 +549,7 @@ async function boot() {
       activePartyGameId !== null &&
       party.state?.hostId !== party.playerId;
     if (remotePartyInput && controls.jump && !partyJumpWasDown)
-      pendingPartyJumpUntil = now + 200;
+      pendingPartyJumpUntil = now + 1000;
     partyJumpWasDown = controls.jump;
     const partyInputs = () => {
       const inputs = new Map<string, PlayerInput>();
@@ -799,14 +799,17 @@ async function boot() {
       Date.now() - lastNetworkSend >= 50
     ) {
       lastNetworkSend = Date.now();
-      void party.sendGameUpdate(
-        remotePartyInput && pendingPartyJumpUntil > now
-          ? { ...controls, jump: true }
-          : controls,
-        party.state?.hostId === party.playerId
-          ? makeNetworkSnapshot()
-          : undefined,
-      );
+      const queuedJump = remotePartyInput && pendingPartyJumpUntil > now;
+      void party
+        .sendGameUpdate(
+          queuedJump ? { ...controls, jump: true } : controls,
+          party.state?.hostId === party.playerId
+            ? makeNetworkSnapshot()
+            : undefined,
+        )
+        .then((sent) => {
+          if (sent && queuedJump) pendingPartyJumpUntil = 0;
+        });
     }
     simulation.cars.forEach((c, i) => {
       c.pose.render(cars[i], alpha);
