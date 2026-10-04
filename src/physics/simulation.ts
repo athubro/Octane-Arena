@@ -21,6 +21,28 @@ export interface Hit {
   strength: number;
   age: number;
 }
+function insideRoundedArena(x: number, z: number, inset = 0) {
+  const { halfWidth, halfLength, corner } = P.arena,
+    width = halfWidth - inset,
+    length = halfLength - inset,
+    radius = Math.max(0, corner - inset),
+    ax = Math.abs(x),
+    az = Math.abs(z);
+  if (ax > width || az > length) return false;
+  if (ax <= width - radius || az <= length - radius) return true;
+  const dx = ax - (width - radius),
+    dz = az - (length - radius);
+  return dx * dx + dz * dz <= radius * radius;
+}
+function insideGoalTunnel(x: number, y: number, z: number, inset = 0) {
+  const { halfLength, goalDepth, goalHalf, goalLip, goalHeight } = P.arena;
+  return (
+    Math.abs(z) > halfLength &&
+    Math.abs(z) <= halfLength + goalDepth - inset &&
+    Math.abs(x) <= goalHalf + goalLip - inset &&
+    y <= goalHeight + goalLip - inset
+  );
+}
 export class Simulation {
   world: RAPIER.World;
   private arenaColliders: RAPIER.Collider[];
@@ -400,17 +422,14 @@ export class Simulation {
     if (!this.ringCourseEnabled && !this.flatArena) this.recoverEscapedBodies();
   }
   private recoverEscapedBodies() {
-    const a = P.arena,
-      carLimitX = a.halfWidth + 0.05,
-      carLimitZ = a.halfLength + a.goalDepth + 0.05,
-      ballLimitZ = a.halfLength + a.goalDepth - P.ball.radius;
+    const a = P.arena;
     for (const car of this.cars) {
       if (!car.active || !car.body.isEnabled()) continue;
       const p = car.body.translation();
       if (
         p.y >= -2.5 &&
-        Math.abs(p.x) <= carLimitX &&
-        Math.abs(p.z) <= carLimitZ
+        (insideRoundedArena(p.x, p.z) ||
+          insideGoalTunnel(p.x, p.y, p.z))
       )
         continue;
       const boost = car.boost,
@@ -426,7 +445,11 @@ export class Simulation {
       car.boost = boost;
     }
     const p = this.ball.translation();
-    if (p.y < -2.5 || Math.abs(p.x) > carLimitX || Math.abs(p.z) > ballLimitZ) {
+    if (
+      p.y < -2.5 ||
+      (!insideRoundedArena(p.x, p.z, P.ball.radius) &&
+        !insideGoalTunnel(p.x, p.y, p.z, P.ball.radius))
+    ) {
       this.ball.setTranslation({ x: 0, y: P.ball.radius + 0.02, z: 0 }, true);
       this.ball.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
       this.ball.setLinvel({ x: 0, y: 0, z: 0 }, true);

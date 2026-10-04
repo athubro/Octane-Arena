@@ -551,6 +551,7 @@ async function boot() {
     if (remotePartyInput && controls.jump && !partyJumpWasDown)
       pendingPartyJumpUntil = now + 1000;
     partyJumpWasDown = controls.jump;
+    if (remotePartyInput) input.takeAction("jump");
     const partyInputs = () => {
       const inputs = new Map<string, PlayerInput>();
       for (const [i, car] of simulation.cars.entries()) {

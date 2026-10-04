@@ -32,7 +32,47 @@ assert.ok(
   Math.abs(ballPosition.z) <=
     P.arena.halfLength + P.arena.goalDepth - P.ball.radius + 0.01,
 );
+
+car.body.setTranslation(
+  {
+    x: P.arena.halfWidth - 1,
+    y: 8,
+    z: P.arena.halfLength - 1,
+  },
+  true,
+);
+simulation.ball.setTranslation(
+  {
+    x: P.arena.halfWidth - 1,
+    y: 8,
+    z: P.arena.halfLength - 1,
+  },
+  true,
+);
+simulation.step([neutral(), neutral()]);
+assert.ok(
+  Math.abs(car.body.translation().z) < P.arena.halfLength,
+  "a car that escapes through a rounded corner is recovered",
+);
+assert.ok(
+  Math.abs(simulation.ball.translation().x) < P.arena.halfWidth / 2,
+  "a ball that escapes through a rounded corner is reset",
+);
+
+car.body.setTranslation(
+  {
+    x: P.arena.halfWidth - 1,
+    y: 8,
+    z: P.arena.halfLength + 2,
+  },
+  true,
+);
+simulation.step([neutral(), neutral()]);
+assert.ok(
+  Math.abs(car.body.translation().z) < P.arena.halfLength,
+  "a car cannot escape behind the end wall outside the goal tunnel",
+);
 simulation.dispose();
 console.log(
-  "PASS escaped vehicles and ball are constrained to the arena envelope",
+  "PASS escaped vehicles and ball are constrained to the rounded arena and goal tunnel",
 );

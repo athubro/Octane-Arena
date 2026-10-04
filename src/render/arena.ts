@@ -52,7 +52,7 @@ function turfTexture() {
   return t;
 }
 function detailedTurfTextures() {
-  const size = 2048,
+  const size = 4096,
     colorCanvas = document.createElement("canvas"),
     heightCanvas = document.createElement("canvas");
   colorCanvas.width = colorCanvas.height = size;
@@ -86,7 +86,7 @@ function detailedTurfTextures() {
     );
     colorContext.fill();
   }
-  for (let i = 0; i < 48000; i++) {
+  for (let i = 0; i < 96000; i++) {
     const x = random() * size,
       y = random() * size,
       length = 4 + random() * 10,
@@ -127,7 +127,7 @@ function detailedTurfTextures() {
     const map = new T.CanvasTexture(canvas);
     map.wrapS = map.wrapT = T.RepeatWrapping;
     map.repeat.set(14, 18);
-    map.anisotropy = 8;
+    map.anisotropy = 16;
     if (isColor) map.colorSpace = T.SRGBColorSpace;
     return map;
   };
