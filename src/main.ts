@@ -103,7 +103,7 @@ async function boot() {
   });
   sun.shadow.bias = -0.0005;
   scene.add(sun);
-  const arena = drawArena(scene);
+  const arena = drawArena(scene, settings.value.quality);
   const ringCourse = new RingCourseView(scene, ringChallenge);
   const ringMap = new RingMap(scene);
   const visuals = [
@@ -229,6 +229,7 @@ async function boot() {
     cameraControl.settings = settings.value.camera;
     effects.density = qualities[settings.value.quality].particles;
     graphics.apply(settings.value.quality);
+    arena.setQuality(settings.value.quality);
   };
   const settingsPanel = new SettingsPanel(settings, input, applySettings);
   const accounts = new Accounts(garage, settings, () => {

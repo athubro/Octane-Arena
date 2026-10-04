@@ -1,6 +1,7 @@
 import * as T from "three";
 import { arenaShell, goalShell } from "../arena/geometry";
 import { P } from "../config/physics";
+import type { Quality } from "../game/settings";
 import { box, material } from "./models";
 function turfTexture() {
   const c = document.createElement("canvas");
@@ -50,17 +51,116 @@ function turfTexture() {
   t.colorSpace = T.SRGBColorSpace;
   return t;
 }
-export function drawArena(scene: T.Scene) {
+function detailedTurfTextures() {
+  const size = 2048,
+    colorCanvas = document.createElement("canvas"),
+    heightCanvas = document.createElement("canvas");
+  colorCanvas.width = colorCanvas.height = size;
+  heightCanvas.width = heightCanvas.height = size;
+  const colorContext = colorCanvas.getContext("2d")!,
+    heightContext = heightCanvas.getContext("2d")!;
+  colorContext.fillStyle = "#174f3b";
+  colorContext.fillRect(0, 0, size, size);
+  heightContext.fillStyle = "#808080";
+  heightContext.fillRect(0, 0, size, size);
+  let seed = 731;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  for (let i = 0; i < 1200; i++) {
+    const x = random() * size,
+      y = random() * size,
+      radius = 8 + random() * 38;
+    colorContext.fillStyle =
+      i % 2 ? "rgba(107, 157, 74, 0.09)" : "rgba(7, 34, 25, 0.11)";
+    colorContext.beginPath();
+    colorContext.ellipse(
+      x,
+      y,
+      radius * (1.3 + random() * 0.8),
+      radius,
+      random() * Math.PI,
+      0,
+      Math.PI * 2,
+    );
+    colorContext.fill();
+  }
+  for (let i = 0; i < 48000; i++) {
+    const x = random() * size,
+      y = random() * size,
+      length = 4 + random() * 10,
+      lean = (random() - 0.5) * 6,
+      bend = (random() - 0.5) * 5,
+      lightness = Math.floor(75 + random() * 100),
+      green = Math.floor(lightness * (0.8 + random() * 0.2)),
+      width = 0.7 + random() * 1.2,
+      light = random() > 0.43;
+    colorContext.strokeStyle = light
+      ? `rgba(${Math.floor(green * 0.72)}, ${green}, ${Math.floor(green * 0.66)}, ${0.2 + random() * 0.42})`
+      : `rgba(${Math.floor(green * 0.24)}, ${Math.floor(green * 0.7)}, ${Math.floor(green * 0.48)}, ${0.24 + random() * 0.42})`;
+    colorContext.lineWidth = width;
+    colorContext.beginPath();
+    colorContext.moveTo(x, y);
+    colorContext.quadraticCurveTo(
+      x + lean * 0.4 + bend,
+      y - length * 0.45,
+      x + lean,
+      y - length,
+    );
+    colorContext.stroke();
+
+    const height = Math.floor(115 + random() * 110);
+    heightContext.strokeStyle = `rgba(${height}, ${height}, ${height}, ${0.35 + random() * 0.4})`;
+    heightContext.lineWidth = width;
+    heightContext.beginPath();
+    heightContext.moveTo(x, y);
+    heightContext.quadraticCurveTo(
+      x + lean * 0.4 + bend,
+      y - length * 0.45,
+      x + lean,
+      y - length,
+    );
+    heightContext.stroke();
+  }
+  const texture = (canvas: HTMLCanvasElement, isColor = false) => {
+    const map = new T.CanvasTexture(canvas);
+    map.wrapS = map.wrapT = T.RepeatWrapping;
+    map.repeat.set(14, 18);
+    map.anisotropy = 8;
+    if (isColor) map.colorSpace = T.SRGBColorSpace;
+    return map;
+  };
+  return { map: texture(colorCanvas, true), bumpMap: texture(heightCanvas) };
+}
+export function drawArena(scene: T.Scene, quality: Quality = "high") {
   const teamMaterials: {
     material: T.MeshBasicMaterial | T.LineBasicMaterial;
     color: number;
   }[] = [];
   const a = P.arena,
-    group = new T.Group();
+    group = new T.Group(),
+    baseTurf = turfTexture(),
+    floorMaterial = new T.MeshStandardMaterial({
+      map: baseTurf,
+      roughness: 0.95,
+    });
+  let detailedTurf: ReturnType<typeof detailedTurfTextures> | undefined,
+    appliedQuality: Quality | undefined;
+  const setQuality = (next: Quality) => {
+    if (next === appliedQuality) return;
+    appliedQuality = next;
+    if (next === "ultra") detailedTurf ??= detailedTurfTextures();
+    floorMaterial.map = next === "ultra" ? detailedTurf!.map : baseTurf;
+    floorMaterial.bumpMap = next === "ultra" ? detailedTurf!.bumpMap : null;
+    floorMaterial.bumpScale = next === "ultra" ? 0.018 : 0;
+    floorMaterial.needsUpdate = true;
+  };
+  setQuality(quality);
   scene.add(group);
   const floor = new T.Mesh(
     new T.PlaneGeometry(a.halfWidth * 2, a.halfLength * 2 + 2 * a.goalDepth),
-    new T.MeshStandardMaterial({ map: turfTexture(), roughness: 0.95 }),
+    floorMaterial,
   );
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
@@ -293,6 +393,7 @@ export function drawArena(scene: T.Scene) {
     line([new T.Vector3(-38, 20.4, z), new T.Vector3(38, 20.4, z)], gridMat);
   drawCity(group);
   return {
+    setQuality,
     setVisible(visible: boolean) {
       group.visible = visible;
     },
