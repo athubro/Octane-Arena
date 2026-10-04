@@ -104,6 +104,7 @@ async function boot() {
   sun.shadow.bias = -0.0005;
   scene.add(sun);
   const arena = drawArena(scene, settings.value.quality);
+  const grassVelocities = simulation.cars.map(() => new T.Vector3());
   const ringCourse = new RingCourseView(scene, ringChallenge);
   const ringMap = new RingMap(scene);
   const visuals = [
@@ -819,6 +820,13 @@ async function boot() {
         cars[i],
       );
     });
+    simulation.cars.forEach((c, i) => grassVelocities[i].copy(c.body.linvel()));
+    arena.updateGrass(
+      cars,
+      grassVelocities,
+      now / 1000,
+      match.phase !== "home",
+    );
     simulation.ballPose.render(ball, alpha);
     animateBall(ball, now / 1000);
     ball.visible = simulation.ball.isEnabled() && match.mode !== "rings";

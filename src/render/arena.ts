@@ -133,6 +133,69 @@ function detailedTurfTextures() {
   };
   return { map: texture(colorCanvas, true), bumpMap: texture(heightCanvas) };
 }
+function grassGeometry(
+  halfWidth: number,
+  halfLength: number,
+  tuftCount: number,
+) {
+  const bladesPerTuft = 3,
+    vertexCount = tuftCount * bladesPerTuft * 3,
+    positions = new Float32Array(vertexCount * 3),
+    roots = new Float32Array(vertexCount * 3),
+    colors = new Float32Array(vertexCount * 3),
+    phases = new Float32Array(vertexCount);
+  const palette = [0x3c8043, 0x56a04c, 0x79b85b, 0xa0c96c].map(
+    (hex) => new T.Color(hex),
+  );
+  let seed = 1949;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  for (let tuft = 0; tuft < tuftCount; tuft++) {
+    const rootX = (random() * 2 - 1) * halfWidth,
+      rootZ = (random() * 2 - 1) * halfLength;
+    for (let blade = 0; blade < bladesPerTuft; blade++) {
+      const angle = random() * Math.PI,
+        sideX = Math.cos(angle),
+        sideZ = Math.sin(angle),
+        width = 0.025 + random() * 0.04,
+        height = 0.14 + random() * 0.22,
+        leanX = (random() - 0.5) * 0.12,
+        leanZ = (random() - 0.5) * 0.12,
+        phase = random() * Math.PI * 2,
+        shade = palette[Math.floor(random() * palette.length)],
+        brightness = 0.82 + random() * 0.36,
+        color = shade.clone().multiplyScalar(brightness);
+      const vertices = [
+        [-width * 0.5, 0, 0],
+        [width * 0.5, 0, 0],
+        [0, height, 1],
+      ];
+      for (let vertex = 0; vertex < 3; vertex++) {
+        const index = (tuft * bladesPerTuft + blade) * 3 + vertex,
+          offset = index * 3,
+          [side, y, along] = vertices[vertex];
+        positions[offset] = sideX * side + leanX * along;
+        positions[offset + 1] = y;
+        positions[offset + 2] = sideZ * side + leanZ * along;
+        roots[offset] = rootX;
+        roots[offset + 1] = 0.018;
+        roots[offset + 2] = rootZ;
+        colors[offset] = color.r;
+        colors[offset + 1] = color.g;
+        colors[offset + 2] = color.b;
+        phases[index] = phase;
+      }
+    }
+  }
+  const geometry = new T.BufferGeometry();
+  geometry.setAttribute("position", new T.BufferAttribute(positions, 3));
+  geometry.setAttribute("aRoot", new T.BufferAttribute(roots, 3));
+  geometry.setAttribute("aColor", new T.BufferAttribute(colors, 3));
+  geometry.setAttribute("aPhase", new T.BufferAttribute(phases, 1));
+  return geometry;
+}
 export function drawArena(scene: T.Scene, quality: Quality = "high") {
   const teamMaterials: {
     material: T.MeshBasicMaterial | T.LineBasicMaterial;
@@ -144,7 +207,68 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
     floorMaterial = new T.MeshStandardMaterial({
       map: baseTurf,
       roughness: 0.95,
-    });
+    }),
+    grassMaterial = new T.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uCarData: {
+          value: Array.from({ length: 4 }, () => new T.Vector4()),
+        },
+        uCarVelocities: {
+          value: Array.from({ length: 4 }, () => new T.Vector3()),
+        },
+      },
+      vertexShader: `
+        attribute vec3 aRoot;
+        attribute vec3 aColor;
+        attribute float aPhase;
+        uniform float uTime;
+        uniform vec4 uCarData[4];
+        uniform vec3 uCarVelocities[4];
+        varying vec3 vColor;
+        varying float vHeight;
+        void main() {
+          float heightAlong = clamp(position.y / 0.36, 0.0, 1.0);
+          vec2 sway = vec2(
+            sin(uTime * 1.8 + aPhase + aRoot.x * 0.17),
+            cos(uTime * 1.35 + aPhase + aRoot.z * 0.14)
+          ) * 0.045 * heightAlong;
+          vec2 bend = sway;
+          float pressure = 0.0;
+          for (int i = 0; i < 4; i++) {
+            vec4 car = uCarData[i];
+            vec2 away = aRoot.xz - car.xy;
+            float distanceToCar = length(away);
+            float influence = (1.0 - smoothstep(0.55, 2.25, distanceToCar)) * car.z;
+            vec3 velocity = uCarVelocities[i];
+            vec2 heading = normalize(velocity.xz + vec2(0.0001, 0.0001));
+            vec2 radial = away / max(distanceToCar, 0.001);
+            float speed = min(length(velocity.xz) / 12.0, 1.0);
+            bend += (radial * 0.62 + heading * speed * 0.9) * influence * 0.34 * heightAlong;
+            pressure = max(pressure, influence);
+          }
+          vec3 transformed = aRoot + position;
+          transformed.xz += bend;
+          transformed.y -= position.y * pressure * 0.72;
+          vColor = aColor;
+          vHeight = heightAlong;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        varying float vHeight;
+        void main() {
+          float light = 0.76 + vHeight * 0.42;
+          gl_FragColor = vec4(vColor * light, 1.0);
+        }
+      `,
+      side: T.DoubleSide,
+    }),
+    grass = new T.Mesh(new T.BufferGeometry(), grassMaterial);
+  grass.frustumCulled = false;
+  grass.renderOrder = 1;
+  group.add(grass);
   let detailedTurf: ReturnType<typeof detailedTurfTextures> | undefined,
     appliedQuality: Quality | undefined;
   const setQuality = (next: Quality) => {
@@ -155,6 +279,13 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
     floorMaterial.bumpMap = next === "ultra" ? detailedTurf!.bumpMap : null;
     floorMaterial.bumpScale = next === "ultra" ? 0.018 : 0;
     floorMaterial.needsUpdate = true;
+    const grassCounts = { low: 9000, medium: 16000, high: 26000, ultra: 38000 };
+    grass.geometry.dispose();
+    grass.geometry = grassGeometry(
+      a.halfWidth - 0.8,
+      a.halfLength + a.goalDepth - 0.8,
+      grassCounts[next],
+    );
   };
   setQuality(quality);
   scene.add(group);
@@ -394,6 +525,29 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
   drawCity(group);
   return {
     setQuality,
+    updateGrass(
+      cars: readonly T.Object3D[],
+      velocities: readonly T.Vector3[],
+      time: number,
+      enabled: boolean,
+    ) {
+      grassMaterial.uniforms.uTime.value = time;
+      const carData = grassMaterial.uniforms.uCarData.value as T.Vector4[],
+        carVelocities = grassMaterial.uniforms.uCarVelocities
+          .value as T.Vector3[];
+      for (let i = 0; i < carData.length; i++) {
+        const car = cars[i],
+          active = enabled && car?.visible && i < velocities.length;
+        carData[i].set(
+          car?.position.x ?? 0,
+          car?.position.z ?? 0,
+          active ? 1 : 0,
+          0,
+        );
+        if (active) carVelocities[i].copy(velocities[i]);
+        else carVelocities[i].set(0, 0, 0);
+      }
+    },
     setVisible(visible: boolean) {
       group.visible = visible;
     },
