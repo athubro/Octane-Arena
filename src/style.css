@@ -111,6 +111,14 @@ small {
   left: 6%;
   pointer-events: none;
 }
+.brand-version {
+  display: block;
+  margin-top: 6px;
+  color: var(--cyan);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+}
 h1 {
   font-size: clamp(40px, 5.2vw, 76px);
   line-height: 1;
