@@ -1,6 +1,7 @@
 import { Vector3, Quaternion } from "three";
 import type { Car } from "../car/car";
 import { neutral, type Controls } from "../input/types";
+import { P } from "../config/physics";
 export class Opponent {
   name = "";
   constructor() {
@@ -25,6 +26,7 @@ export class Opponent {
   }
   private target = new Vector3();
   private local = new Vector3();
+  private goalDirection = new Vector3();
   private inverse = new Quaternion();
   private nextJump = 0;
   sample(
@@ -34,12 +36,25 @@ export class Opponent {
   ): Controls {
     const c = neutral(),
       p = car.body.translation();
-    // Orange attacks +Z. Approach from behind the ball; retreat if it is behind us.
-    this.target.set(ball.x, 0, ball.z - 4);
-    if (p.z > ball.z + 2)
-      this.target.set(ball.x + (p.x > ball.x ? 6 : -6), 0, ball.z - 8);
+    const attackSign = car.team === 0 ? -1 : 1;
+    this.goalDirection
+      .set(-ball.x, 0, attackSign * (P.arena.halfLength + 5 - ball.z))
+      .normalize();
+    this.target
+      .set(ball.x, 0, ball.z)
+      .addScaledVector(this.goalDirection, -4);
+    const progress =
+      (p.x - ball.x) * this.goalDirection.x +
+      (p.z - ball.z) * this.goalDirection.z;
+    if (progress > 2)
+      this.target
+        .set(ball.x, 0, ball.z)
+        .addScaledVector(this.goalDirection, -8);
+    else if (this.target.distanceTo(p) < 3)
+      this.target
+        .set(ball.x, 0, ball.z)
+        .addScaledVector(this.goalDirection, 6);
     const distance = this.target.distanceTo(p);
-    if (distance < 5) this.target.set(ball.x, 0, ball.z + 1);
     this.local
       .copy(this.target)
       .sub(p)

@@ -151,6 +151,11 @@ class InMemoryPartyTransport implements PartyTransport {
                       type: "mode" as const,
                       mode: (data as PartyActions["mode"]).mode,
                     }
+                  : action === "field"
+                    ? {
+                        type: "field" as const,
+                        field: (data as PartyActions["field"]).field,
+                      }
                   : action === "stage"
                     ? {
                         type: "stage" as const,

@@ -777,6 +777,14 @@ export class WebRtcPartyTransport implements PartyTransport {
           mode: (data as PartyActions["mode"]).mode,
         },
       };
+    if (action === "field")
+      return {
+        type: "lobby" as const,
+        action: {
+          type: "field" as const,
+          field: (data as PartyActions["field"]).field,
+        },
+      };
     if (action === "stage")
       return {
         type: "lobby" as const,

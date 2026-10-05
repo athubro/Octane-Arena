@@ -2,6 +2,7 @@ import * as T from "three";
 import { arenaShell, goalShell } from "../arena/geometry";
 import { P } from "../config/physics";
 import type { Quality } from "../game/settings";
+import type { ArenaField } from "../../shared/party";
 import { box, material } from "./models";
 function turfTexture() {
   const c = document.createElement("canvas");
@@ -50,6 +51,47 @@ function turfTexture() {
   t.repeat.set(14, 18);
   t.colorSpace = T.SRGBColorSpace;
   return t;
+}
+function neoTokyoGroundTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1024;
+  const ctx = canvas.getContext("2d")!;
+  const gradient = ctx.createLinearGradient(0, 0, 1024, 1024);
+  gradient.addColorStop(0, "#252b35");
+  gradient.addColorStop(0.5, "#171d27");
+  gradient.addColorStop(1, "#30303a");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 1024, 1024);
+  let seed = 8173;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  for (let i = 0; i < 24000; i++) {
+    const x = random() * 1024,
+      y = random() * 1024,
+      light = random() > 0.5;
+    ctx.fillStyle = light
+      ? `rgba(127, 177, 194, ${random() * 0.08})`
+      : `rgba(3, 8, 15, ${random() * 0.16})`;
+    ctx.fillRect(x, y, 1 + random() * 3, 1 + random() * 2);
+  }
+  for (let i = 0; i < 34; i++) {
+    const x = random() * 1024,
+      y = random() * 1024;
+    ctx.strokeStyle = i % 2 ? "rgba(54, 208, 238, .16)" : "rgba(255, 112, 74, .15)";
+    ctx.lineWidth = 2 + random() * 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 70 + random() * 220, y + (random() - 0.5) * 16);
+    ctx.stroke();
+  }
+  const texture = new T.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = T.RepeatWrapping;
+  texture.repeat.set(5, 7);
+  texture.colorSpace = T.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
 }
 function detailedTurfTextures() {
   const size = 4096,
@@ -238,8 +280,7 @@ function grassGeometry(
         leanZ = (random() - 0.5) * 0.18,
         phase = random() * Math.PI * 2,
         shade = palette[Math.floor(random() * palette.length)],
-        brightness = 0.82 + random() * 0.36,
-        color = shade.clone().multiplyScalar(brightness);
+        brightness = 0.82 + random() * 0.36;
       const index = tuft * bladesPerTuft + blade,
         rootOffset = index * 3,
         pairOffset = index * 2,
@@ -253,9 +294,9 @@ function grassGeometry(
       leans[pairOffset + 1] = leanZ;
       sizes[pairOffset] = width;
       sizes[pairOffset + 1] = height;
-      colors[colorOffset] = color.r;
-      colors[colorOffset + 1] = color.g;
-      colors[colorOffset + 2] = color.b;
+      colors[colorOffset] = shade.r * brightness;
+      colors[colorOffset + 1] = shade.g * brightness;
+      colors[colorOffset + 2] = shade.b * brightness;
       phases[index] = phase;
     }
   }
@@ -386,10 +427,10 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
     floorMaterial.needsUpdate = true;
     const grassCounts = {
       low: 40000,
-      medium: 100000,
-      high: 180000,
-      ultra: 400000,
-      cinematic: 500000,
+      medium: 90000,
+      high: 130000,
+      ultra: 160000,
+      cinematic: 180000,
     };
     grass.geometry.dispose();
     grass.geometry = grassGeometry(
@@ -407,6 +448,31 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   group.add(floor);
+  const neoTokyo = drawNeoTokyo(group);
+  neoTokyo.visible = false;
+  let neoGround: T.CanvasTexture | undefined,
+    field: ArenaField = "lumen";
+  const setField = (field: ArenaField) => {
+    const isNeoTokyo = field === "neo-tokyo";
+    if (isNeoTokyo) neoGround ??= neoTokyoGroundTexture();
+    floorMaterial.map = isNeoTokyo
+      ? neoGround!
+      : quality === "ultra" || quality === "cinematic"
+        ? detailedTurf!.map
+        : baseTurf;
+    floorMaterial.bumpMap = isNeoTokyo
+      ? null
+      : quality === "ultra" || quality === "cinematic"
+        ? detailedTurf!.bumpMap
+        : null;
+    floorMaterial.bumpScale = isNeoTokyo ? 0 : quality === "ultra" || quality === "cinematic" ? 0.018 : 0;
+    floorMaterial.color.setHex(isNeoTokyo ? 0xc3d2d7 : 0xffffff);
+    floorMaterial.roughness = isNeoTokyo ? 0.38 : 0.95;
+    floorMaterial.needsUpdate = true;
+    neoTokyo.visible = isNeoTokyo;
+    grass.visible = !isNeoTokyo;
+  };
+  setField("lumen");
   const stripe = new T.MeshBasicMaterial({
     color: 0x5ac7ac,
     transparent: true,
@@ -638,11 +704,17 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
   let cityQuality = quality;
   return {
     setQuality(next: Quality) {
+      quality = next;
       setQuality(next);
+      setField(field);
       if (cityQuality !== next) {
         cityQuality = next;
         setCityQuality(next);
       }
+    },
+    setField(next: ArenaField) {
+      field = next;
+      setField(next);
     },
     updateGrass(
       cars: readonly T.Object3D[],
@@ -675,6 +747,78 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
         entry.material.color.setHex(neutral ? 0xa8a8a8 : entry.color);
     },
   };
+}
+
+function drawNeoTokyo(parent: T.Object3D) {
+  const city = new T.Group(),
+    structure = new T.MeshStandardMaterial({
+      color: 0x263647,
+      metalness: 0.5,
+      roughness: 0.38,
+    }),
+    trim = new T.MeshStandardMaterial({
+      color: 0x52e5fa,
+      emissive: 0x13a9dc,
+      emissiveIntensity: 1.4,
+      metalness: 0.45,
+      roughness: 0.26,
+    }),
+    warm = new T.MeshStandardMaterial({
+      color: 0xff9668,
+      emissive: 0xea4b35,
+      emissiveIntensity: 1.25,
+      metalness: 0.35,
+      roughness: 0.28,
+    }),
+    window = new T.MeshStandardMaterial({
+      color: 0xa5e9ff,
+      emissive: 0x3aa5d8,
+      emissiveIntensity: 0.7,
+      roughness: 0.25,
+      metalness: 0.25,
+    });
+  parent.add(city);
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 10; i++) {
+      const z = -48 + i * 10.5,
+        x = side * (P.arena.halfWidth + 10 + (i % 3) * 2),
+        height = 18 + ((i * 19) % 26),
+        width = 6 + (i % 4);
+      box(city, [width, height, 8], [x, height / 2, z], structure).castShadow = false;
+      box(city, [width + 0.4, 0.3, 8.3], [x, height + 0.15, z], trim).castShadow = false;
+      for (let level = 1.8; level < height - 1; level += 2.8) {
+        box(
+          city,
+          [width * 0.62, 0.8, 0.12],
+          [x, level, z - side * 4.08],
+          (i + Math.floor(level)) % 4 === 0 ? warm : window,
+        ).castShadow = false;
+      }
+      if (i % 2 === 0)
+        box(city, [width + 0.8, 0.45, 0.6], [x, height * 0.63, z], warm).castShadow =
+          false;
+    }
+    for (const z of [-39, 0, 39]) {
+      box(city, [0.24, 27, 0.24], [side * 43.5, 13, z], structure).castShadow =
+        false;
+      box(city, [0.32, 0.2, 16], [side * 43.5, 27, z], trim).castShadow = false;
+    }
+    box(city, [0.45, 0.45, 108], [side * 43, 0.15, 0], trim).castShadow = false;
+  }
+  const arch = new T.Mesh(
+    new T.TorusGeometry(43, 0.22, 8, 96),
+    trim,
+  );
+  arch.rotation.x = Math.PI / 2;
+  arch.scale.set(1, 0.48, 1);
+  arch.position.y = 14;
+  city.add(arch);
+  const secondArch = arch.clone();
+  secondArch.material = warm;
+  secondArch.position.z = P.arena.halfLength + 6;
+  secondArch.scale.set(0.94, 0.45, 1);
+  city.add(secondArch);
+  return city;
 }
 
 /** Lumen District: original terraced towers, lit windows and elevated skybridges. */
@@ -759,7 +903,7 @@ function drawCity(scene: T.Object3D) {
   );
   moon.position.set(-65, 75, -130);
   city.add(moon);
-  const cinematicDistrict = drawCinematicDistrict(city);
+  let cinematicDistrict: T.Group | undefined;
   let textures: ReturnType<typeof facadeTextures> | undefined;
   return (quality: Quality) => {
     const detailed = quality === "ultra" || quality === "cinematic";
@@ -768,7 +912,10 @@ function drawCity(scene: T.Object3D) {
     facade.bumpMap = detailed ? textures!.bumpMap : null;
     facade.bumpScale = detailed ? 0.055 : 0;
     facade.needsUpdate = true;
-    cinematicDistrict.visible = quality === "cinematic";
+    if (quality === "cinematic") {
+      cinematicDistrict ??= drawCinematicDistrict(city);
+      cinematicDistrict.visible = true;
+    } else if (cinematicDistrict) cinematicDistrict.visible = false;
   };
 }
 

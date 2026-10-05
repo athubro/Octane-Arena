@@ -422,14 +422,13 @@ export class Simulation {
     if (!this.ringCourseEnabled && !this.flatArena) this.recoverEscapedBodies();
   }
   private recoverEscapedBodies() {
-    const a = P.arena;
     for (const car of this.cars) {
       if (!car.active || !car.body.isEnabled()) continue;
       const p = car.body.translation();
       if (
         p.y >= -2.5 &&
-        (insideRoundedArena(p.x, p.z) ||
-          insideGoalTunnel(p.x, p.y, p.z))
+        (insideRoundedArena(p.x, p.z, -1.5) ||
+          insideGoalTunnel(p.x, p.y, p.z, -1.5))
       )
         continue;
       const boost = car.boost,
@@ -447,8 +446,8 @@ export class Simulation {
     const p = this.ball.translation();
     if (
       p.y < -2.5 ||
-      (!insideRoundedArena(p.x, p.z, P.ball.radius) &&
-        !insideGoalTunnel(p.x, p.y, p.z, P.ball.radius))
+      (!insideRoundedArena(p.x, p.z, P.ball.radius - 1.5) &&
+        !insideGoalTunnel(p.x, p.y, p.z, P.ball.radius - 1.5))
     ) {
       this.ball.setTranslation({ x: 0, y: P.ball.radius + 0.02, z: 0 }, true);
       this.ball.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);

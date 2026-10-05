@@ -5,7 +5,7 @@ export const qualities = {
   medium: { scale: 0.85, shadows: 1024, particles: 0.5, aa: true },
   high: { scale: 1, shadows: 2048, particles: 1, aa: true },
   ultra: { scale: 1.3, shadows: 4096, particles: 1.5, aa: true },
-  cinematic: { scale: 1.4, shadows: 4096, particles: 1.75, aa: true },
+  cinematic: { scale: 1.15, shadows: 2048, particles: 1.5, aa: true },
 };
 export interface CameraSettings {
   fov: number;

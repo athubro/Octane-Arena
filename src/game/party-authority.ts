@@ -79,6 +79,7 @@ export class PartyAuthority {
       hostId: member.id,
       members: [member],
       mode: "1v1",
+      field: "lumen",
       stage: "home",
       game: null,
     };

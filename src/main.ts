@@ -46,6 +46,7 @@ import { RingChallenge } from "./game/ring-challenge";
 import { RingCourseView } from "./render/ring-course";
 import { RingMap } from "./render/ring-map";
 import type {
+  ArenaField,
   MatchSnapshot,
   PartyGame,
   Vec3Tuple,
@@ -104,6 +105,8 @@ async function boot() {
   sun.shadow.bias = -0.0005;
   scene.add(sun);
   const arena = drawArena(scene, settings.value.quality);
+  let selectedField: ArenaField = "lumen",
+    pendingMode: "bot" | "freeplay" | "rings" = "bot";
   const grassVelocities = simulation.cars.map(() => new T.Vector3());
   const ringCourse = new RingCourseView(scene, ringChallenge);
   const ringMap = new RingMap(scene);
@@ -217,6 +220,7 @@ async function boot() {
   });
   updatePreset();
   const resetEffects = () => {
+    explosion.reset();
     vehicleEffects.forEach((e) => e.reset());
     skidMarks.forEach((e) => e.reset());
     demoFlashes.forEach((e) => e.reset());
@@ -277,6 +281,7 @@ async function boot() {
         : "bot",
   ) => {
     ui.modes(false);
+    arena.setField(selectedField);
     simulation.setRingCourse(mode === "rings", RingChallenge.startingPosition);
     arena.setVisible(mode !== "rings");
     ringMap.setVisible(mode === "rings");
@@ -355,6 +360,8 @@ async function boot() {
     input.clear();
     resetEffects();
     ui.modes(false);
+    selectedField = party.state?.field ?? "lumen";
+    arena.setField(selectedField);
     simulation.setRingCourse(false);
     arena.setVisible(true);
     ringMap.setVisible(false);
@@ -394,9 +401,36 @@ async function boot() {
     audio.unlock();
     ui.modes(true);
   });
-  ui.on("bot-mode", () => start("bot"));
-  ui.on("freeplay-mode", () => start("freeplay"));
-  ui.on("rings-mode", () => start("rings"));
+  const chooseMode = (mode: "bot" | "freeplay" | "rings") => {
+    pendingMode = mode;
+    ui.fields(true);
+    document
+      .querySelectorAll<HTMLButtonElement>("[data-field]")
+      .forEach((button) =>
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.field === selectedField),
+        ),
+      );
+  };
+  ui.on("bot-mode", () => chooseMode("bot"));
+  ui.on("freeplay-mode", () => chooseMode("freeplay"));
+  ui.on("rings-mode", () => chooseMode("rings"));
+  document.querySelectorAll<HTMLButtonElement>("[data-field]").forEach((button) => {
+    button.onclick = () => {
+      selectedField = button.dataset.field as ArenaField;
+      document
+        .querySelectorAll<HTMLButtonElement>("[data-field]")
+        .forEach((candidate) =>
+          candidate.setAttribute(
+            "aria-pressed",
+            String(candidate.dataset.field === selectedField),
+          ),
+        );
+    };
+  });
+  ui.on("fields-back", () => ui.fields(false));
+  ui.on("field-start", () => start(pendingMode));
   ui.on("garage-open", () => {
     ui.screen = "garage";
     garagePanel.customizing = false;

@@ -6,6 +6,11 @@ export const normalizePartyCode = (code: string) =>
 export const validPartyCode = (code: string) =>
   /^[A-HJKMNP-Z2-9]{5,6}$/.test(code);
 export type PartyMode = "1v1" | "2v2" | "2v2bots";
+export type ArenaField = "lumen" | "neo-tokyo";
+export const arenaFields: { id: ArenaField; label: string }[] = [
+  { id: "lumen", label: "Lumen District" },
+  { id: "neo-tokyo", label: "Neo Tokyo" },
+];
 export type PartyStage = "home" | "mode" | "teams";
 export const partyModes: { id: PartyMode; label: string }[] = [
   { id: "1v1", label: "1 VS 1" },
@@ -93,6 +98,7 @@ export interface PartyState {
   hostId: string;
   members: PartyMember[];
   mode: PartyMode;
+  field: ArenaField;
   stage: PartyStage;
   game: PartyGame | null;
 }
@@ -110,6 +116,7 @@ export interface PartyActions {
   team: { team: PartyTeam };
   ready: { ready: boolean };
   mode: { mode: PartyMode };
+  field: { field: ArenaField };
   stage: { stage: PartyStage };
   disconnect: Record<string, never>;
   startMatch: Record<string, never>;

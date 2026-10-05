@@ -315,6 +315,7 @@ export function registerParties(
       hostId: p.member.id,
       members: [p.member],
       mode: "1v1",
+      field: "lumen",
       stage: "home",
       game: null,
     });
@@ -424,6 +425,18 @@ export function registerParties(
       if (m.team !== null && ++counts[m.team] > teamCapacity(mode, m.team))
         m.team = null;
     }
+    return state(p);
+  });
+  app.post("/api/party/field", async (req) => {
+    const p = get(req),
+      party = p.code ? parties.get(p.code) : null,
+      field = (req.body as PartyActions["field"])?.field;
+    if (!party || party.hostId !== p.member.id)
+      return fail(403, "ONLY THE HOST CAN CHANGE THE FIELD");
+    if (party.game?.status === "playing") return fail(409, "MATCH IN PROGRESS");
+    if (field !== "lumen" && field !== "neo-tokyo")
+      return fail(400, "INVALID FIELD");
+    party.field = field;
     return state(p);
   });
   app.post("/api/party/stage", async (req) => {

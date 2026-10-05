@@ -4,6 +4,7 @@ export class Input {
   keys = new Set<string>();
   actions = new Set<string>();
   private padPrevious = new Set<number>();
+  controllerMode = false;
   capturing = false;
   constructor(public bindings: Bindings = { ...defaultBindings }) {
     window.addEventListener("keydown", (e) => {
@@ -30,17 +31,20 @@ export class Input {
   }
   sample(): Controls {
     const c = neutral(),
+      keyboardEnabled = !this.controllerMode,
       down = (action: Action) => this.keys.has(this.bindings[action]);
     if (this.capturing || document.querySelector("dialog[open]")) return c;
-    c.throttle = Number(down("throttle")) - Number(down("reverse"));
-    c.steer = Number(down("right")) - Number(down("left"));
-    c.pitch =
-      c.throttle + Number(down("pitchForward")) - Number(down("pitchBack"));
-    c.yaw = c.steer + Number(down("yawRight")) - Number(down("yawLeft"));
-    c.roll = Number(down("rollRight")) - Number(down("rollLeft"));
-    c.jump = down("jump") || this.actions.has(this.bindings.jump);
-    c.boost = down("boost");
-    c.slide = down("slide");
+    if (keyboardEnabled) {
+      c.throttle = Number(down("throttle")) - Number(down("reverse"));
+      c.steer = Number(down("right")) - Number(down("left"));
+      c.pitch =
+        c.throttle + Number(down("pitchForward")) - Number(down("pitchBack"));
+      c.yaw = c.steer + Number(down("yawRight")) - Number(down("yawLeft"));
+      c.roll = Number(down("rollRight")) - Number(down("rollLeft"));
+      c.jump = down("jump") || this.actions.has(this.bindings.jump);
+      c.boost = down("boost");
+      c.slide = down("slide");
+    }
     c.dodgeX = c.yaw || c.roll;
     c.dodgeY = c.pitch;
     const pad = Array.from(navigator.getGamepads?.() ?? []).find(
@@ -71,7 +75,7 @@ export class Input {
       c.dodgeX = deadAxis(pad.axes[0]);
       c.dodgeY = -deadAxis(pad.axes[1]);
     }
-    if (down("airRoll") || c.slide) {
+    if ((keyboardEnabled && down("airRoll")) || c.slide) {
       c.roll += c.steer;
       c.yaw = 0;
     }

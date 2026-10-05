@@ -68,8 +68,10 @@ export class Graphics {
     this.resize();
   }
   resize() {
-    const ratio =
-      Math.min(devicePixelRatio, 1.75) * qualities[this.quality].scale;
+    const ratio = Math.min(
+      Math.min(devicePixelRatio, 1.75) * qualities[this.quality].scale,
+      2,
+    );
     this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(innerWidth, innerHeight);
     this.composer.setPixelRatio(ratio);

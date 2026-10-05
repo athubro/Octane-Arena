@@ -1,5 +1,6 @@
 import type {
   PartyMember,
+  ArenaField,
   PartyMode,
   PartyStage,
   PartyState,
@@ -9,6 +10,7 @@ export type PartyLobbyAction =
   | { type: "team"; team: PartyMember["team"] }
   | { type: "ready"; ready: boolean }
   | { type: "mode"; mode: PartyMode }
+  | { type: "field"; field: ArenaField }
   | { type: "stage"; stage: PartyStage }
   | { type: "kick"; playerId: string };
 
@@ -139,6 +141,13 @@ export function applyPartyLobbyAction(
       )
         member.team = null;
     }
+    return {};
+  }
+
+  if (action.type === "field") {
+    if (action.field !== "lumen" && action.field !== "neo-tokyo")
+      return { status: 400, error: "INVALID FIELD" };
+    party.field = action.field;
     return {};
   }
 

@@ -1,5 +1,11 @@
 import type { PartyClient } from "../game/party";
-import { partyModes, teamCapacity, type PartyMode } from "../../shared/party";
+import {
+  arenaFields,
+  partyModes,
+  teamCapacity,
+  type ArenaField,
+  type PartyMode,
+} from "../../shared/party";
 
 export class PartyFlow {
   dialog = document.createElement("dialog");
@@ -7,7 +13,7 @@ export class PartyFlow {
   constructor(private party: PartyClient) {
     this.dialog.id = "party-flow";
     this.dialog.setAttribute("aria-label", "Party game setup");
-    this.dialog.innerHTML = `<section id="party-mode-screen"><header><h2>CHOOSE MODE</h2><span class="party-flow-host"></span></header><div class="party-mode-cards">${partyModes.map((m) => `<button class="party-mode-card" data-mode="${m.id}" aria-pressed="false"><span class="mode-emblem" aria-hidden="true">${m.id === "1v1" ? "Ⅰ : Ⅰ" : m.id === "2v2" ? "Ⅱ : Ⅱ" : "Ⅱ : ▣"}</span><strong>${m.label}</strong></button>`).join("")}</div><footer><button class="back-button" data-stage="home">BACK</button><button id="party-continue" class="party-button" data-stage="teams">CONTINUE →</button></footer></section><section id="party-team-screen" hidden><header><div><span class="arena-caption">LUMEN DISTRICT</span><h2>CHOOSE YOUR SIDE</h2></div><span id="party-match-mode"></span></header><div class="party-team-board">${[0, 1].map((t) => `<section class="party-team-column" data-team="${t}"><header><h3>${t === 0 ? "BLUE" : "ORANGE"}</h3><span class="team-count"></span></header><div class="team-rows"></div><button class="party-button party-team-join" data-team="${t}">JOIN ${t === 0 ? "BLUE" : "ORANGE"}</button></section>`).join("")}</div><div id="party-unassigned"></div><footer><button class="back-button" data-stage="mode">CHANGE MODE</button><button id="party-match-start" class="party-button">START MATCH</button><button id="party-team-leave" class="back-button">LEAVE PARTY</button><span class="party-network-note">The host can start when both sides are filled.</span></footer></section><p id="party-flow-message" role="status" aria-live="polite"></p>`;
+    this.dialog.innerHTML = `<section id="party-mode-screen"><header><h2>CHOOSE MODE</h2><span class="party-flow-host"></span></header><div class="party-mode-cards">${partyModes.map((m) => `<button class="party-mode-card" data-mode="${m.id}" aria-pressed="false"><span class="mode-emblem" aria-hidden="true">${m.id === "1v1" ? "Ⅰ : Ⅰ" : m.id === "2v2" ? "Ⅱ : Ⅱ" : "Ⅱ : ▣"}</span><strong>${m.label}</strong></button>`).join("")}</div><footer><button class="back-button" data-stage="home">BACK</button><button id="party-continue" class="party-button" data-stage="teams">CONTINUE →</button></footer></section><section id="party-team-screen" hidden><header><div><span class="arena-caption" id="party-field-caption">LUMEN DISTRICT</span><h2>CHOOSE YOUR SIDE</h2></div><span id="party-match-mode"></span></header><div class="party-field-picker">${arenaFields.map((field) => `<button class="party-field-choice" data-party-field="${field.id}" aria-pressed="false">${field.label}</button>`).join("")}</div><div class="party-team-board">${[0, 1].map((t) => `<section class="party-team-column" data-team="${t}"><header><h3>${t === 0 ? "BLUE" : "ORANGE"}</h3><span class="team-count"></span></header><div class="team-rows"></div><button class="party-button party-team-join" data-team="${t}">JOIN ${t === 0 ? "BLUE" : "ORANGE"}</button></section>`).join("")}</div><div id="party-unassigned"></div><footer><button class="back-button" data-stage="mode">CHANGE MODE</button><button id="party-match-start" class="party-button">START MATCH</button><button id="party-team-leave" class="back-button">LEAVE PARTY</button><span class="party-network-note">The host chooses the field before starting.</span></footer></section><p id="party-flow-message" role="status" aria-live="polite"></p>`;
     document.getElementById("app")!.append(this.dialog);
     const leaveMode = document.createElement("button");
     leaveMode.id = "party-mode-leave";
@@ -20,6 +26,14 @@ export class PartyFlow {
       .forEach((b) => {
         b.onclick = () =>
           void party.action("mode", { mode: b.dataset.mode as PartyMode });
+      });
+    this.dialog
+      .querySelectorAll<HTMLButtonElement>("[data-party-field]")
+      .forEach((b) => {
+        b.onclick = () =>
+          void party.action("field", {
+            field: b.dataset.partyField as ArenaField,
+          });
       });
     this.dialog
       .querySelectorAll<HTMLButtonElement>("[data-stage]")
@@ -91,6 +105,17 @@ export class PartyFlow {
       });
     this.dialog.querySelector<HTMLElement>("#party-match-mode")!.textContent =
       partyModes.find((m) => m.id === s.mode)!.label;
+    this.dialog.querySelector<HTMLElement>("#party-field-caption")!.textContent =
+      arenaFields.find((field) => field.id === s.field)!.label.toUpperCase();
+    this.dialog
+      .querySelectorAll<HTMLButtonElement>("[data-party-field]")
+      .forEach((button) => {
+        button.disabled = !host || p.busy || s.game?.status === "playing";
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.partyField === s.field),
+        );
+      });
     const local = s.members.find((m) => m.id === p.playerId);
     const blueCount = s.members.filter((m) => m.team === 0).length;
     const orangeCount = s.members.filter((m) => m.team === 1).length;

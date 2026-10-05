@@ -76,6 +76,22 @@ test("WebRTC authority enforces lobby rules and membership actions", () => {
     authority.action(hostToken, { type: "stage", stage: "teams" }).ok,
     true,
   );
+  assert.equal(
+    authority.action(hostToken, {
+      type: "field",
+      field: "neo-tokyo",
+    }).reply.party?.field,
+    "neo-tokyo",
+  );
+  assert.equal(
+    errorOf(
+      authority.action(guest1Token, {
+        type: "field",
+        field: "lumen",
+      }),
+    ),
+    "ONLY THE HOST CAN CONTINUE",
+  );
   assert.equal(authority.action(hostToken, { type: "team", team: 0 }).ok, true);
   assert.equal(
     authority.action(guest1Token, { type: "team", team: 0 }).ok,

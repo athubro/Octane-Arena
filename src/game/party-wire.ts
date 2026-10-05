@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { presetSchema } from "../../shared/accounts";
 import {
+  arenaFields,
   partyModes,
   validPartyCode,
   type MatchSnapshot,
@@ -15,6 +16,9 @@ const modeSchema = z.enum(
   partyModes.map(({ id }) => id) as [PartyMode, ...PartyMode[]],
 );
 const stageSchema = z.enum(["home", "mode", "teams"] satisfies PartyStage[]);
+const fieldSchema = z.enum(
+  arenaFields.map(({ id }) => id) as ["lumen", "neo-tokyo"],
+);
 const inputSchema = z
   .object({
     throttle: z.number().finite().min(-1).max(1),
@@ -141,6 +145,7 @@ const partySchema = z
     hostId: z.string().min(1).max(100),
     members: z.array(memberSchema).max(4),
     mode: modeSchema,
+    field: fieldSchema,
     stage: stageSchema,
     game: gameSchema.nullable(),
   })
@@ -162,6 +167,7 @@ const lobbyActionSchema = z.discriminatedUnion("type", [
     .strict(),
   z.object({ type: z.literal("ready"), ready: z.boolean() }).strict(),
   z.object({ type: z.literal("mode"), mode: modeSchema }).strict(),
+  z.object({ type: z.literal("field"), field: fieldSchema }).strict(),
   z.object({ type: z.literal("stage"), stage: stageSchema }).strict(),
   z
     .object({ type: z.literal("kick"), playerId: z.string().min(1).max(100) })

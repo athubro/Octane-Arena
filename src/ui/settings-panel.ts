@@ -166,7 +166,10 @@ export class SettingsPanel {
           this.save();
         };
     } else if (this.tab === "controls") {
-      host.innerHTML = `<div class="binding-list">${(
+      const controllerAvailable = Array.from(
+        navigator.getGamepads?.() ?? [],
+      ).some((pad) => pad?.connected);
+      host.innerHTML = `<div class="controller-setting"><div><strong>CONTROLLER MODE</strong><p class="field-note">${controllerAvailable ? "Gamepad connected — standard controls supported." : "Connect a gamepad to use controller mode."}</p></div><button id="controller-mode" class="small-button" aria-pressed="${this.input.controllerMode}">${this.input.controllerMode ? "ON" : "OFF"}</button></div><div class="binding-list">${(
         Object.keys(defaultBindings) as Action[]
       )
         .filter((k) => k !== "reset")
@@ -177,6 +180,11 @@ export class SettingsPanel {
         .join(
           "",
         )}</div><p id="binding-note" class="field-note" role="status">${Object.keys(p.bindings).some((k) => conflicts(p.bindings, k as Action).length) ? "Duplicate bindings highlighted. Both actions will run." : "Select an action, then press a key. Escape cancels."}</p><button id="reset-bindings" class="small-button">RESET BINDINGS</button>`;
+      host.querySelector<HTMLButtonElement>("#controller-mode")!.onclick = () => {
+        this.input.controllerMode = !this.input.controllerMode;
+        this.input.clear();
+        this.render();
+      };
       host.querySelectorAll<HTMLButtonElement>("[data-action]").forEach(
         (b) =>
           (b.onclick = () => {

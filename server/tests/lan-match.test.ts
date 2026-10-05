@@ -94,6 +94,14 @@ test("LAN host starts a shared match and relays inputs and snapshots", async () 
     await send(0, "/stage", { stage: "teams" });
     assert.equal((await send(0, "/team", { team: 0 })).statusCode, 200);
     assert.equal((await send(1, "/team", { team: 1 })).statusCode, 200);
+    const field = await send(0, "/field", { field: "neo-tokyo" });
+    assert.equal(field.statusCode, 200);
+    assert.equal(field.json().party.field, "neo-tokyo");
+    assert.equal(
+      (await send(1, "/field", { field: "lumen" })).statusCode,
+      403,
+    );
+    assert.equal((await send(0, "/field", { field: "unknown" })).statusCode, 400);
 
     const started = await send(0, "/game/start");
     assert.equal(started.statusCode, 200);
