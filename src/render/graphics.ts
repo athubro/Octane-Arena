@@ -3,6 +3,8 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { qualities, type Quality } from "../game/settings";
@@ -12,6 +14,8 @@ export class Graphics {
   private baseFog: { color: T.Color; near: number; far: number } | null = null;
   private composer: EffectComposer;
   private renderPass: RenderPass;
+  private ao: GTAOPass;
+  private bloom: UnrealBloomPass;
   private aa = new ShaderPass(FXAAShader);
   private environment: T.Texture | null = null;
   constructor(
@@ -29,6 +33,13 @@ export class Graphics {
     this.composer = new EffectComposer(renderer);
     this.renderPass = new RenderPass(this.scene, camera);
     this.composer.addPass(this.renderPass);
+    this.ao = new GTAOPass(this.scene, camera, 640, 360);
+    this.ao.output = GTAOPass.OUTPUT.Default;
+    this.ao.enabled = false;
+    this.composer.addPass(this.ao);
+    this.bloom = new UnrealBloomPass(new T.Vector2(640, 360), 0.22, 0.55, 0.82);
+    this.bloom.enabled = false;
+    this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.composer.addPass(this.aa);
   }
@@ -37,6 +48,8 @@ export class Graphics {
     this.applied = quality;
     this.quality = quality;
     const q = qualities[quality];
+    this.ao.enabled = quality === "ultra" || quality === "cinematic";
+    this.bloom.enabled = quality === "cinematic";
     if (quality === "ultra" || quality === "cinematic") {
       if (!this.environment) {
         const room = new RoomEnvironment(),
@@ -59,6 +72,7 @@ export class Graphics {
         quality === "cinematic" ? Math.max(this.baseFog.far, 440) : this.baseFog.far;
     }
     this.renderer.shadowMap.enabled = q.shadows > 0;
+    this.sun.shadow.radius = quality === "cinematic" ? 5 : quality === "ultra" ? 3 : 1;
     if (this.sun.shadow.mapSize.x !== q.shadows && q.shadows) {
       this.sun.shadow.mapSize.set(q.shadows, q.shadows);
       this.sun.shadow.map?.dispose();

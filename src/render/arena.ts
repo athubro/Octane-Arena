@@ -274,8 +274,8 @@ function grassGeometry(
       const angle = random() * Math.PI,
         sideX = Math.cos(angle),
         sideZ = Math.sin(angle),
-        width = 0.045 + random() * 0.055,
-        height = 0.17 + random() * 0.15,
+        width = 0.025 + random() * 0.035,
+        height = 0.075 + random() * 0.055,
         leanX = (random() - 0.5) * 0.18,
         leanZ = (random() - 0.5) * 0.18,
         phase = random() * Math.PI * 2,
@@ -331,6 +331,10 @@ function grassGeometry(
     new T.InstancedBufferAttribute(phases, 1),
   );
   geometry.instanceCount = bladeCount;
+  geometry.boundingSphere = new T.Sphere(
+    new T.Vector3(0, 0.08, 0),
+    Math.hypot(halfWidth, halfLength, 0.16),
+  );
   return geometry;
 }
 export function drawArena(scene: T.Scene, quality: Quality = "high") {
@@ -367,6 +371,7 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
         uniform vec3 uCarVelocities[4];
         varying vec3 vColor;
         varying float vHeight;
+        varying vec2 vRoot;
         void main() {
           float heightAlong = clamp(position.y, 0.0, 1.0);
           vec2 sway = vec2(
@@ -397,21 +402,24 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
           transformed.y -= blade.y * pressure * 0.72;
           vColor = aColor;
           vHeight = heightAlong;
+          vRoot = aRoot.xz;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
         }
       `,
       fragmentShader: `
         varying vec3 vColor;
         varying float vHeight;
+        varying vec2 vRoot;
         void main() {
-          float light = 0.76 + vHeight * 0.42;
-          gl_FragColor = vec4(vColor * light, 1.0);
+          float light = 0.68 + vHeight * 0.5;
+          float variation = 0.96 + 0.04 * sin(vRoot.x * 4.7 + vRoot.y * 3.9);
+          gl_FragColor = vec4(vColor * light * variation, 1.0);
         }
       `,
       side: T.DoubleSide,
     }),
     grass = new T.Mesh(new T.BufferGeometry(), grassMaterial);
-  grass.frustumCulled = false;
+  grass.frustumCulled = true;
   grass.renderOrder = 1;
   group.add(grass);
   let detailedTurf: ReturnType<typeof detailedTurfTextures> | undefined,
@@ -426,11 +434,11 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
     floorMaterial.bumpScale = detailed ? 0.018 : 0;
     floorMaterial.needsUpdate = true;
     const grassCounts = {
-      low: 40000,
-      medium: 90000,
-      high: 130000,
-      ultra: 160000,
-      cinematic: 180000,
+      low: 55000,
+      medium: 105000,
+      high: 150000,
+      ultra: 190000,
+      cinematic: 225000,
     };
     grass.geometry.dispose();
     grass.geometry = grassGeometry(
