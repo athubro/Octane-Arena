@@ -427,8 +427,8 @@ export class Simulation {
       const p = car.body.translation();
       if (
         p.y >= -2.5 &&
-        (insideRoundedArena(p.x, p.z, -1.5) ||
-          insideGoalTunnel(p.x, p.y, p.z, -1.5))
+        (insideRoundedArena(p.x, p.z) ||
+          insideGoalTunnel(p.x, p.y, p.z))
       )
         continue;
       const boost = car.boost,
