@@ -1,10 +1,11 @@
 import { defaultBindings, type Bindings } from "./controls.js";
-export type Quality = "low" | "medium" | "high" | "ultra";
+export type Quality = "low" | "medium" | "high" | "ultra" | "cinematic";
 export const qualities = {
   low: { scale: 0.65, shadows: 0, particles: 0.2, aa: false },
   medium: { scale: 0.85, shadows: 1024, particles: 0.5, aa: true },
   high: { scale: 1, shadows: 2048, particles: 1, aa: true },
   ultra: { scale: 1.3, shadows: 4096, particles: 1.5, aa: true },
+  cinematic: { scale: 1.4, shadows: 4096, particles: 1.75, aa: true },
 };
 export interface CameraSettings {
   fov: number;

@@ -134,7 +134,7 @@ function detailedTurfTextures() {
   return { map: texture(colorCanvas, true), bumpMap: texture(heightCanvas) };
 }
 function facadeTextures() {
-  const size = 1024,
+  const size = 2048,
     colorCanvas = document.createElement("canvas"),
     heightCanvas = document.createElement("canvas");
   colorCanvas.width = colorCanvas.height = size;
@@ -206,11 +206,13 @@ function grassGeometry(
   tuftCount: number,
 ) {
   const bladesPerTuft = 4,
-    vertexCount = tuftCount * bladesPerTuft * 3,
-    positions = new Float32Array(vertexCount * 3),
-    roots = new Float32Array(vertexCount * 3),
-    colors = new Float32Array(vertexCount * 3),
-    phases = new Float32Array(vertexCount);
+    bladeCount = tuftCount * bladesPerTuft,
+    roots = new Float32Array(bladeCount * 3),
+    sides = new Float32Array(bladeCount * 2),
+    leans = new Float32Array(bladeCount * 2),
+    sizes = new Float32Array(bladeCount * 2),
+    colors = new Float32Array(bladeCount * 3),
+    phases = new Float32Array(bladeCount);
   const palette = [0x3c8043, 0x56a04c, 0x79b85b, 0xa0c96c].map(
     (hex) => new T.Color(hex),
   );
@@ -219,48 +221,75 @@ function grassGeometry(
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 0x100000000;
   };
+  const columns = Math.ceil(Math.sqrt((tuftCount * halfWidth) / halfLength)),
+    rows = Math.ceil(tuftCount / columns);
   for (let tuft = 0; tuft < tuftCount; tuft++) {
-    const rootX = (random() * 2 - 1) * halfWidth,
-      rootZ = (random() * 2 - 1) * halfLength;
+    const column = tuft % columns,
+      row = Math.floor(tuft / columns),
+      rootX = ((column + random()) / columns) * halfWidth * 2 - halfWidth,
+      rootZ = ((row + random()) / rows) * halfLength * 2 - halfLength;
     for (let blade = 0; blade < bladesPerTuft; blade++) {
       const angle = random() * Math.PI,
         sideX = Math.cos(angle),
         sideZ = Math.sin(angle),
-        width = 0.03 + random() * 0.045,
-        height = 0.1 + random() * 0.1,
-        leanX = (random() - 0.5) * 0.14,
-        leanZ = (random() - 0.5) * 0.14,
+        width = 0.045 + random() * 0.055,
+        height = 0.17 + random() * 0.15,
+        leanX = (random() - 0.5) * 0.18,
+        leanZ = (random() - 0.5) * 0.18,
         phase = random() * Math.PI * 2,
         shade = palette[Math.floor(random() * palette.length)],
         brightness = 0.82 + random() * 0.36,
         color = shade.clone().multiplyScalar(brightness);
-      const vertices = [
-        [-width * 0.5, 0, 0],
-        [width * 0.5, 0, 0],
-        [0, height, 1],
-      ];
-      for (let vertex = 0; vertex < 3; vertex++) {
-        const index = (tuft * bladesPerTuft + blade) * 3 + vertex,
-          offset = index * 3,
-          [side, y, along] = vertices[vertex];
-        positions[offset] = sideX * side + leanX * along;
-        positions[offset + 1] = y;
-        positions[offset + 2] = sideZ * side + leanZ * along;
-        roots[offset] = rootX;
-        roots[offset + 1] = 0.018;
-        roots[offset + 2] = rootZ;
-        colors[offset] = color.r;
-        colors[offset + 1] = color.g;
-        colors[offset + 2] = color.b;
-        phases[index] = phase;
-      }
+      const index = tuft * bladesPerTuft + blade,
+        rootOffset = index * 3,
+        pairOffset = index * 2,
+        colorOffset = index * 3;
+      roots[rootOffset] = rootX;
+      roots[rootOffset + 1] = 0.018;
+      roots[rootOffset + 2] = rootZ;
+      sides[pairOffset] = sideX;
+      sides[pairOffset + 1] = sideZ;
+      leans[pairOffset] = leanX;
+      leans[pairOffset + 1] = leanZ;
+      sizes[pairOffset] = width;
+      sizes[pairOffset + 1] = height;
+      colors[colorOffset] = color.r;
+      colors[colorOffset + 1] = color.g;
+      colors[colorOffset + 2] = color.b;
+      phases[index] = phase;
     }
   }
-  const geometry = new T.BufferGeometry();
-  geometry.setAttribute("position", new T.BufferAttribute(positions, 3));
-  geometry.setAttribute("aRoot", new T.BufferAttribute(roots, 3));
-  geometry.setAttribute("aColor", new T.BufferAttribute(colors, 3));
-  geometry.setAttribute("aPhase", new T.BufferAttribute(phases, 1));
+  const geometry = new T.InstancedBufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new T.Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0, 0, 1, 1], 3),
+  );
+  geometry.setIndex([0, 1, 2]);
+  geometry.setAttribute(
+    "aRoot",
+    new T.InstancedBufferAttribute(roots, 3),
+  );
+  geometry.setAttribute(
+    "aSide",
+    new T.InstancedBufferAttribute(sides, 2),
+  );
+  geometry.setAttribute(
+    "aLean",
+    new T.InstancedBufferAttribute(leans, 2),
+  );
+  geometry.setAttribute(
+    "aSize",
+    new T.InstancedBufferAttribute(sizes, 2),
+  );
+  geometry.setAttribute(
+    "aColor",
+    new T.InstancedBufferAttribute(colors, 3),
+  );
+  geometry.setAttribute(
+    "aPhase",
+    new T.InstancedBufferAttribute(phases, 1),
+  );
+  geometry.instanceCount = bladeCount;
   return geometry;
 }
 export function drawArena(scene: T.Scene, quality: Quality = "high") {
@@ -287,6 +316,9 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
       },
       vertexShader: `
         attribute vec3 aRoot;
+        attribute vec2 aSide;
+        attribute vec2 aLean;
+        attribute vec2 aSize;
         attribute vec3 aColor;
         attribute float aPhase;
         uniform float uTime;
@@ -295,7 +327,7 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
         varying vec3 vColor;
         varying float vHeight;
         void main() {
-          float heightAlong = clamp(position.y / 0.2, 0.0, 1.0);
+          float heightAlong = clamp(position.y, 0.0, 1.0);
           vec2 sway = vec2(
             sin(uTime * 1.8 + aPhase + aRoot.x * 0.17),
             cos(uTime * 1.35 + aPhase + aRoot.z * 0.14)
@@ -314,9 +346,14 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
             bend += (radial * 0.62 + heading * speed * 0.9) * influence * 0.34 * heightAlong;
             pressure = max(pressure, influence);
           }
-          vec3 transformed = aRoot + position;
+          vec3 blade = vec3(
+            aSide.x * position.x * aSize.x + aLean.x * position.z * aSize.y,
+            position.y * aSize.y,
+            aSide.y * position.x * aSize.x + aLean.y * position.z * aSize.y
+          );
+          vec3 transformed = aRoot + blade;
           transformed.xz += bend;
-          transformed.y -= position.y * pressure * 0.72;
+          transformed.y -= blade.y * pressure * 0.72;
           vColor = aColor;
           vHeight = heightAlong;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
@@ -341,16 +378,18 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
   const setQuality = (next: Quality) => {
     if (next === appliedQuality) return;
     appliedQuality = next;
-    if (next === "ultra") detailedTurf ??= detailedTurfTextures();
-    floorMaterial.map = next === "ultra" ? detailedTurf!.map : baseTurf;
-    floorMaterial.bumpMap = next === "ultra" ? detailedTurf!.bumpMap : null;
-    floorMaterial.bumpScale = next === "ultra" ? 0.018 : 0;
+    const detailed = next === "ultra" || next === "cinematic";
+    if (detailed) detailedTurf ??= detailedTurfTextures();
+    floorMaterial.map = detailed ? detailedTurf!.map : baseTurf;
+    floorMaterial.bumpMap = detailed ? detailedTurf!.bumpMap : null;
+    floorMaterial.bumpScale = detailed ? 0.018 : 0;
     floorMaterial.needsUpdate = true;
     const grassCounts = {
       low: 40000,
-      medium: 72000,
-      high: 120000,
-      ultra: 160000,
+      medium: 100000,
+      high: 180000,
+      ultra: 400000,
+      cinematic: 500000,
     };
     grass.geometry.dispose();
     grass.geometry = grassGeometry(
@@ -595,14 +634,14 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
   for (let z = -48; z <= 48; z += 6)
     line([new T.Vector3(-38, 20.4, z), new T.Vector3(38, 20.4, z)], gridMat);
   const setCityQuality = drawCity(group);
-  setCityQuality(quality === "ultra");
-  let cityUltra = quality === "ultra";
+  setCityQuality(quality);
+  let cityQuality = quality;
   return {
     setQuality(next: Quality) {
       setQuality(next);
-      if (cityUltra !== (next === "ultra")) {
-        cityUltra = next === "ultra";
-        setCityQuality(cityUltra);
+      if (cityQuality !== next) {
+        cityQuality = next;
+        setCityQuality(next);
       }
     },
     updateGrass(
@@ -720,12 +759,146 @@ function drawCity(scene: T.Object3D) {
   );
   moon.position.set(-65, 75, -130);
   city.add(moon);
+  const cinematicDistrict = drawCinematicDistrict(city);
   let textures: ReturnType<typeof facadeTextures> | undefined;
-  return (ultra: boolean) => {
-    if (ultra) textures ??= facadeTextures();
-    facade.map = ultra ? textures!.map : null;
-    facade.bumpMap = ultra ? textures!.bumpMap : null;
-    facade.bumpScale = ultra ? 0.055 : 0;
+  return (quality: Quality) => {
+    const detailed = quality === "ultra" || quality === "cinematic";
+    if (detailed) textures ??= facadeTextures();
+    facade.map = detailed ? textures!.map : null;
+    facade.bumpMap = detailed ? textures!.bumpMap : null;
+    facade.bumpScale = detailed ? 0.055 : 0;
     facade.needsUpdate = true;
+    cinematicDistrict.visible = quality === "cinematic";
   };
+}
+
+function drawCinematicDistrict(parent: T.Object3D) {
+  const district = new T.Group();
+  parent.add(district);
+  const ground = new T.Mesh(
+    new T.PlaneGeometry(560, 680),
+    material(0x202b36, 0.15, 0.92),
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -1.5;
+  ground.receiveShadow = true;
+  district.add(ground);
+
+  const buildingCount = 64,
+    bodyMaterial = new T.MeshStandardMaterial({
+      color: 0x657987,
+      metalness: 0.48,
+      roughness: 0.32,
+    }),
+    roofMaterial = material(0x9aabb2, 0.72, 0.28),
+    windowsMaterial = new T.MeshStandardMaterial({
+      color: 0xffd89a,
+      emissive: 0xf49a48,
+      emissiveIntensity: 1.5,
+      roughness: 0.22,
+      metalness: 0.1,
+    }),
+    accentMaterial = new T.MeshStandardMaterial({
+      color: 0x73eaff,
+      emissive: 0x19bce5,
+      emissiveIntensity: 1.2,
+      metalness: 0.35,
+      roughness: 0.3,
+    }),
+    bodies = new T.InstancedMesh(
+      new T.BoxGeometry(1, 1, 1),
+      bodyMaterial,
+      buildingCount,
+    ),
+    roofs = new T.InstancedMesh(
+      new T.BoxGeometry(1, 1, 1),
+      roofMaterial,
+      buildingCount,
+    ),
+    windows = new T.InstancedMesh(
+      new T.BoxGeometry(0.7, 1.05, 0.08),
+      windowsMaterial,
+      12000,
+    ),
+    accents = new T.InstancedMesh(
+      new T.BoxGeometry(0.18, 1, 0.14),
+      accentMaterial,
+      buildingCount * 2,
+    ),
+    dummy = new T.Object3D();
+  bodies.castShadow = false;
+  bodies.receiveShadow = false;
+  roofs.castShadow = false;
+  roofs.receiveShadow = false;
+  let windowCount = 0,
+    accentCount = 0,
+    seed = 5021;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  for (let i = 0; i < buildingCount; i++) {
+    const angle = (i / buildingCount) * Math.PI * 2 + (random() - 0.5) * 0.12,
+      x = Math.cos(angle) * (132 + random() * 72),
+      z = Math.sin(angle) * (158 + random() * 82),
+      width = 9 + random() * 9,
+      depth = 8 + random() * 8,
+      height = 30 + random() * 74;
+    dummy.position.set(x, height / 2 - 1.5, z);
+    dummy.scale.set(width, height, depth);
+    dummy.updateMatrix();
+    bodies.setMatrixAt(i, dummy.matrix);
+    bodies.setColorAt(
+      i,
+      new T.Color().setHSL(0.56 + random() * 0.04, 0.16, 0.32 + random() * 0.2),
+    );
+    dummy.position.set(x, height - 1.1, z);
+    dummy.scale.set(width + 0.8, 0.9, depth + 0.8);
+    dummy.updateMatrix();
+    roofs.setMatrixAt(i, dummy.matrix);
+
+    const levels = Math.floor(height / 4.5),
+      columns = Math.max(2, Math.floor(width / 2.2));
+    for (let level = 0; level < levels; level++)
+      for (let col = 0; col < columns; col++)
+        for (const side of [-1, 1]) {
+          if (random() < 0.18 || windowCount >= windows.instanceMatrix.count)
+            continue;
+          const wx = x - width / 2 + ((col + 0.5) * width) / columns,
+            wy = 1 + level * 4.5,
+            wz = z + side * (depth / 2 + 0.045);
+          dummy.position.set(wx, wy, wz);
+          dummy.rotation.set(0, side < 0 ? Math.PI : 0, 0);
+          dummy.scale.set(1, 1, 1);
+          dummy.updateMatrix();
+          windows.setMatrixAt(windowCount, dummy.matrix);
+          windows.setColorAt(
+            windowCount++,
+            random() > 0.84
+              ? new T.Color(0x83eaff)
+              : new T.Color().setHSL(0.1, 0.55, 0.55 + random() * 0.25),
+          );
+        }
+    dummy.rotation.set(0, 0, 0);
+    for (const side of [-1, 1]) {
+      dummy.position.set(
+        x + side * (width / 2 + 0.12),
+        height * 0.48,
+        z - depth / 2 - 0.08,
+      );
+      dummy.scale.set(1, height * 0.76, 1);
+      dummy.updateMatrix();
+      accents.setMatrixAt(accentCount++, dummy.matrix);
+    }
+  }
+  windows.count = windowCount;
+  accents.count = accentCount;
+  bodies.instanceMatrix.needsUpdate = true;
+  roofs.instanceMatrix.needsUpdate = true;
+  windows.instanceMatrix.needsUpdate = true;
+  accents.instanceMatrix.needsUpdate = true;
+  if (bodies.instanceColor) bodies.instanceColor.needsUpdate = true;
+  if (windows.instanceColor) windows.instanceColor.needsUpdate = true;
+  district.add(bodies, roofs, windows, accents);
+  return district;
 }

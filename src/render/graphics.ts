@@ -9,6 +9,7 @@ import { qualities, type Quality } from "../game/settings";
 export class Graphics {
   quality: Quality = "high";
   private applied: Quality | null = null;
+  private baseFog: { color: T.Color; near: number; far: number } | null = null;
   private composer: EffectComposer;
   private renderPass: RenderPass;
   private aa = new ShaderPass(FXAAShader);
@@ -19,6 +20,12 @@ export class Graphics {
     camera: T.Camera,
     private sun: T.DirectionalLight,
   ) {
+    if (scene.fog instanceof T.Fog)
+      this.baseFog = {
+        color: scene.fog.color.clone(),
+        near: scene.fog.near,
+        far: scene.fog.far,
+      };
     this.composer = new EffectComposer(renderer);
     this.renderPass = new RenderPass(this.scene, camera);
     this.composer.addPass(this.renderPass);
@@ -30,7 +37,7 @@ export class Graphics {
     this.applied = quality;
     this.quality = quality;
     const q = qualities[quality];
-    if (quality === "ultra") {
+    if (quality === "ultra" || quality === "cinematic") {
       if (!this.environment) {
         const room = new RoomEnvironment(),
           pmrem = new T.PMREMGenerator(this.renderer);
@@ -39,10 +46,17 @@ export class Graphics {
         pmrem.dispose();
       }
       this.scene.environment = this.environment;
-      this.scene.environmentIntensity = 0.8;
+      this.scene.environmentIntensity = quality === "cinematic" ? 1.1 : 0.8;
     } else {
       this.scene.environment = null;
       this.scene.environmentIntensity = 1;
+    }
+    if (this.baseFog && this.scene.fog instanceof T.Fog) {
+      this.scene.fog.color.copy(this.baseFog.color);
+      this.scene.fog.near =
+        quality === "cinematic" ? Math.max(this.baseFog.near, 190) : this.baseFog.near;
+      this.scene.fog.far =
+        quality === "cinematic" ? Math.max(this.baseFog.far, 440) : this.baseFog.far;
     }
     this.renderer.shadowMap.enabled = q.shadows > 0;
     if (this.sun.shadow.mapSize.x !== q.shadows && q.shadows) {

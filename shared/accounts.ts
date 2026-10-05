@@ -93,7 +93,7 @@ export const preferencesSchema = z
         ),
       )
       .strict(),
-    quality: z.enum(["low", "medium", "high", "ultra"]),
+    quality: z.enum(["low", "medium", "high", "ultra", "cinematic"]),
     audio: z
       .object({
         master: z.number().min(0).max(1),

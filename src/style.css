@@ -658,7 +658,7 @@ output {
 }
 .quality-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
   gap: 12px;
   margin: 20px 0 26px;
 }
@@ -672,6 +672,10 @@ output {
   border-color: var(--cyan);
   background: #427984;
   color: #e2ffff;
+}
+.quality-grid button[data-quality="cinematic"] {
+  font-size: clamp(11px, 1.4vw, 15px);
+  letter-spacing: 0.04em;
 }
 .quality-info {
   display: grid;
