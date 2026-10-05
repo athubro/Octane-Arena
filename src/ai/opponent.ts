@@ -4,6 +4,7 @@ import { neutral, type Controls } from "../input/types";
 import { P } from "../config/physics";
 export class Opponent {
   name = "";
+  level = 3;
   constructor() {
     this.rename();
   }
@@ -61,16 +62,17 @@ export class Opponent {
       .applyQuaternion(this.inverse.copy(car.body.rotation()).invert());
     const angle = Math.atan2(this.local.x, -this.local.z);
     c.steer = Math.max(-1, Math.min(1, angle * 2));
-    c.throttle = 1;
+    const skill = Math.max(0, Math.min(1, (this.level - 1) / 9));
+    c.throttle = 0.72 + skill * 0.28;
     c.slide = Math.abs(angle) > 1 && Math.abs(car.forwardSpeed) > 4;
-    c.boost = Math.abs(angle) < 0.18 && distance > 9 && car.boost > 15;
+    c.boost = Math.abs(angle) < 0.18 + (1 - skill) * 0.12 && distance > 9 && car.boost > 15 && (skill > 0.25 || time % 4 < 2.5);
     if (Math.abs(angle) > 2.4 && distance < 9) {
       c.throttle = -1;
       c.steer = -c.steer;
     }
     if (
       ball.y > 1.4 &&
-      ball.y < 4 &&
+      ball.y < 4 + skill * 2 &&
       new Vector3().copy(ball).distanceTo(p) < 4 &&
       car.grounded &&
       time > this.nextJump

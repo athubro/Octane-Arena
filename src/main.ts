@@ -9,6 +9,7 @@ import { FixedLoop } from "./physics/loop";
 import { Input } from "./input/input";
 import { Opponent } from "./ai/opponent";
 import { Match } from "./game/match";
+import { RankedBotRating } from "./game/ranked-bot";
 import { Pads } from "./game/pads";
 import { GameCamera } from "./camera/camera";
 import {
@@ -273,6 +274,8 @@ async function boot() {
   leaveDialog.querySelector<HTMLButtonElement>("#leave-confirm-stay")!.onclick =
     stay;
   const loop = new FixedLoop();
+  const rankedBot = new RankedBotRating();
+  let rankedQueue = false, rankedSettled = false;
   const start = (
     mode: "bot" | "freeplay" | "rings" = match.mode === "freeplay"
       ? "freeplay"
@@ -289,6 +292,9 @@ async function boot() {
     audio.unlock();
     input.clear();
     updatePreset();
+    opponent.level = rankedQueue ? rankedBot.level : 3;
+    ui.rankedResult = "";
+    rankedSettled = false;
     ringChallenge.start();
     ringCourse.syncActiveGate();
     opponent.rename();
@@ -403,6 +409,8 @@ async function boot() {
   });
   const chooseMode = (mode: "bot" | "freeplay" | "rings") => {
     pendingMode = mode;
+    rankedQueue = false;
+    document.getElementById("cpu-level-control")!.toggleAttribute("hidden", true);
     ui.fields(true);
     document
       .querySelectorAll<HTMLButtonElement>("[data-field]")
@@ -414,6 +422,14 @@ async function boot() {
       );
   };
   ui.on("bot-mode", () => chooseMode("bot"));
+  ui.on("ranked-mode", () => {
+    chooseMode("bot");
+    rankedQueue = true;
+    document.getElementById("cpu-level-control")!.removeAttribute("hidden");
+    const select = document.getElementById("cpu-level") as HTMLSelectElement;
+    select.value = String(rankedBot.level);
+    document.getElementById("cpu-elo-label")!.textContent = `CPU ELO ${rankedBot.elo}`;
+  });
   ui.on("freeplay-mode", () => chooseMode("freeplay"));
   ui.on("rings-mode", () => chooseMode("rings"));
   document.querySelectorAll<HTMLButtonElement>("[data-field]").forEach((button) => {
@@ -431,6 +447,11 @@ async function boot() {
   });
   ui.on("fields-back", () => ui.fields(false));
   ui.on("field-start", () => start(pendingMode));
+  document.getElementById("cpu-level")!.addEventListener("change", (event) => {
+    rankedBot.setLevel(Number((event.currentTarget as HTMLSelectElement).value));
+    opponent.level = rankedBot.level;
+    document.getElementById("cpu-elo-label")!.textContent = `CPU ELO ${rankedBot.elo}`;
+  });
   ui.on("garage-open", () => {
     ui.screen = "garage";
     garagePanel.customizing = false;
@@ -791,7 +812,19 @@ async function boot() {
           )
             simulation.cars[0].boost = 100;
         }
+        const wasFinished = match.phase === "finished";
         match.tick(simulation);
+        if (
+          !wasFinished && match.phase === "finished" && rankedQueue &&
+          !rankedSettled
+        ) {
+          rankedSettled = true;
+          if (match.score[0] > match.score[1]) {
+            const reward = rankedBot.winReward();
+            const total = rankedBot.recordWin();
+            ui.rankedResult = ` · +${reward} CPU ELO (TOTAL ${total})`;
+          } else ui.rankedResult = " · NO CPU ELO AWARDED";
+        }
         if (match.resetSequence !== resetSequence && match.rules.training) {
           resetEffects();
           pads.reset();

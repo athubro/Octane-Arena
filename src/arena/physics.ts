@@ -63,10 +63,23 @@ export function createArena(world: RAPIER.World, flat = false) {
 }
 
 export function createRingPlatform(world: RAPIER.World) {
-  return world.createCollider(
-    RAPIER.ColliderDesc.cuboid(12, 0.4, 17)
-      .setTranslation(0, -0.4, 43)
+  const deck = world.createCollider(
+    // Cover the full ring course. The old start pad ended around ring five,
+    // leaving later gates above an invisible arena floor that was disabled.
+    RAPIER.ColliderDesc.cuboid(12, 0.4, 78)
+      .setTranslation(0, -0.4, -20)
       .setFriction(0.7)
       .setRestitution(0.05),
   );
+  // The deck has a visible guard rail in Ring Rush. Give it a solid matching
+  // collision surface so the rail, rather than recovery, catches side exits.
+  const rail = (x: number, z: number, hx: number, hz: number) =>
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(hx, 2, hz)
+        .setTranslation(x, 2, z)
+        .setFriction(0.35)
+        .setRestitution(0.05),
+    );
+  return [deck, rail(-11.65, -20, 0.35, 78), rail(11.65, -20, 0.35, 78),
+    rail(0, -97.65, 11.65, 0.35), rail(0, 57.65, 11.65, 0.35)];
 }

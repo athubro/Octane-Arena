@@ -23,13 +23,46 @@ assert.equal(
 );
 
 const platformRay = new RAPIER.Ray(
-  { x: 0, y: 5, z: 43 },
+  { x: 0, y: 5, z: -50 },
   { x: 0, y: -1, z: 0 },
 );
 assert.ok(
   simulation.world.castRay(platformRay, 10, true),
-  "the floating platform remains solid in Ring Rush",
+  "the extended course platform remains solid beneath ring six",
 );
+for (const [name, origin, direction] of [
+  ["left", { x: -14, y: 1.5, z: -50 }, { x: 1, y: 0, z: 0 }],
+  ["right", { x: 14, y: 1.5, z: -50 }, { x: -1, y: 0, z: 0 }],
+  ["far end", { x: 0, y: 1.5, z: -102 }, { x: 0, y: 0, z: 1 }],
+  ["near end", { x: 0, y: 1.5, z: 62 }, { x: 0, y: 0, z: -1 }],
+] as const) {
+  assert.ok(
+    simulation.world.castRay(new RAPIER.Ray(origin, direction), 8, true),
+    `visible course boundary has a solid ${name} collider`,
+  );
+}
+for (const z of [20, 6, -8, -22, -36, -50, -64, -78, -92]) {
+  const ray = new RAPIER.Ray({ x: 0, y: 5, z }, { x: 0, y: -1, z: 0 });
+  assert.ok(simulation.world.castRay(ray, 10, true), `course deck supports ring at z=${z}`);
+}
+const car = simulation.cars[0];
+for (const [name, position, velocity, axis] of [
+  ["left", { x: -10.7, y: 1, z: -50 }, { x: -80, y: 0, z: 0 }, "x"],
+  ["right", { x: 10.7, y: 1, z: -50 }, { x: 80, y: 0, z: 0 }, "x"],
+  ["far end", { x: 0, y: 1, z: -96 }, { x: 0, y: 0, z: -80 }, "z"],
+  ["near end", { x: 0, y: 1, z: 56 }, { x: 0, y: 0, z: 80 }, "z"],
+] as const) {
+  car.reset(0, 51, 0);
+  car.body.setTranslation(position, true);
+  car.body.setLinvel(velocity, true);
+  for (let i = 0; i < 8; i++) simulation.step([]);
+  const p = car.body.translation();
+  assert.ok(Math.abs(p.x) <= 11.2 && p.z >= -97 && p.z <= 57,
+    `${name} high-speed launch remains inside the ring course: ${p.x}, ${p.z}`);
+}
+car.body.setTranslation({ x: 0, y: -8, z: -104 }, true);
+simulation.step([]);
+assert.ok(car.body.translation().z > 45, "falling beyond a rail recovers to spawn");
 
 simulation.setRingCourse(false);
 assert.ok(

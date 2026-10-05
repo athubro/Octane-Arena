@@ -93,6 +93,35 @@ function neoTokyoGroundTexture() {
   texture.anisotropy = 8;
   return texture;
 }
+function cityFacadeTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256; canvas.height = 512;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createLinearGradient(0, 0, 256, 512);
+  g.addColorStop(0, "#9aadb0"); g.addColorStop(.38, "#425968"); g.addColorStop(1, "#172b3b");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 256, 512);
+  for (let x = 8; x < 256; x += 34) {
+    ctx.fillStyle = "#d7d8ce"; ctx.fillRect(x, 0, 7, 512);
+    for (let y = 10; y < 512; y += 30) {
+      ctx.fillStyle = (x + y) % 5 ? "rgba(20,48,64,.86)" : "rgba(250,185,111,.58)";
+      ctx.fillRect(x + 10, y, 20, 21);
+      ctx.strokeStyle = "rgba(225,238,235,.34)"; ctx.strokeRect(x + 10, y, 20, 21);
+    }
+  }
+  const t = new T.CanvasTexture(canvas); t.colorSpace = T.SRGBColorSpace; return t;
+}
+function treeCanopyTexture() {
+  const canvas = document.createElement("canvas"); canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext("2d")!;
+  let seed = 2718; const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < 190; i++) {
+    const r = 5 + random() * 15, x = 16 + random() * 96, y = 16 + random() * 96;
+    ctx.fillStyle = ["#315c48", "#527d57", "#7b965d", "#9b5261"][i % 4];
+    ctx.globalAlpha = .35 + random() * .55; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  const t = new T.CanvasTexture(canvas); t.colorSpace = T.SRGBColorSpace; return t;
+}
 function detailedTurfTextures() {
   const size = 4096,
     colorCanvas = document.createElement("canvas"),
@@ -759,6 +788,8 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
 
 function drawNeoTokyo(parent: T.Object3D) {
   const city = new T.Group(),
+    facade = new T.MeshBasicMaterial({ map: cityFacadeTexture(), side: T.DoubleSide }),
+    canopy = new T.MeshBasicMaterial({ map: treeCanopyTexture(), transparent: true, alphaTest: 0.08, side: T.DoubleSide }),
     structure = new T.MeshStandardMaterial({
       color: 0x263647,
       metalness: 0.5,
@@ -793,6 +824,10 @@ function drawNeoTokyo(parent: T.Object3D) {
         height = 18 + ((i * 19) % 26),
         width = 6 + (i % 4);
       box(city, [width, height, 8], [x, height / 2, z], structure).castShadow = false;
+      const facadePanel = new T.Mesh(new T.PlaneGeometry(width * 0.88, height * 0.92), facade);
+      facadePanel.position.set(x - side * (width / 2 + 0.025), height / 2, z);
+      facadePanel.rotation.y = -side * Math.PI / 2;
+      city.add(facadePanel);
       box(city, [width + 0.4, 0.3, 8.3], [x, height + 0.15, z], trim).castShadow = false;
       for (let level = 1.8; level < height - 1; level += 2.8) {
         box(
@@ -812,6 +847,16 @@ function drawNeoTokyo(parent: T.Object3D) {
       box(city, [0.32, 0.2, 16], [side * 43.5, 27, z], trim).castShadow = false;
     }
     box(city, [0.45, 0.45, 108], [side * 43, 0.15, 0], trim).castShadow = false;
+    // Low garden planters and lightweight image canopy cards give the skyline
+    // a softer, more lived-in edge without adding dense geometry.
+    for (let i = 0; i < 9; i++) {
+      const z = -47 + i * 11.5, x = side * (P.arena.halfWidth - 1.1);
+      box(city, [1.5, 0.42, 3.4], [x, 0.2, z], structure).castShadow = false;
+      const trunk = new T.Mesh(new T.CylinderGeometry(0.13, 0.22, 2.2, 6), structure);
+      trunk.position.set(x, 1.45, z); trunk.castShadow = false; city.add(trunk);
+      const leaves = new T.Mesh(new T.PlaneGeometry(4.2, 5.4), canopy);
+      leaves.position.set(x, 4.1, z); leaves.rotation.y = side * 0.08; city.add(leaves);
+    }
   }
   const arch = new T.Mesh(
     new T.TorusGeometry(43, 0.22, 8, 96),

@@ -9,27 +9,36 @@ export class RingMap {
     this.background = scene.background;
     this.fog = scene.fog;
     const deck = new T.Mesh(
-      new T.BoxGeometry(24, 0.8, 34),
+      new T.BoxGeometry(24, 0.8, 156),
       new T.MeshStandardMaterial({
         color: 0x53677d,
         metalness: 0.55,
         roughness: 0.38,
       }),
     );
-    deck.position.set(0, -0.4, 43);
+    deck.position.set(0, -0.4, -20);
     deck.receiveShadow = true;
     deck.castShadow = true;
     this.group.add(deck);
-    this.addBox([23.4, 0.1, 33.4], [0, 0.02, 43], 0x253d52);
-    this.addBox([0.18, 0.025, 32], [-9.4, 0.085, 43], 0x40dcf3);
-    this.addBox([0.18, 0.025, 32], [9.4, 0.085, 43], 0x40dcf3);
-    this.addBox([0.12, 0.025, 32], [0, 0.085, 43], 0xb6e9fa);
-    this.addBox([24, 0.32, 0.35], [0, -0.56, 26.1], 0xf5bf67);
-    this.addBox([1.2, 4, 1.2], [-8.8, -3, 31], 0x35536d);
-    this.addBox([1.2, 4, 1.2], [8.8, -3, 31], 0x35536d);
-    this.addBox([1.2, 6, 1.2], [-8.8, -4, 55], 0x35536d);
-    this.addBox([1.2, 6, 1.2], [8.8, -4, 55], 0x35536d);
-    for (let z = 31; z <= 55; z += 6) this.addChevron(z);
+    // Guard rails mark the exact edge of the floating course and match the
+    // solid Rapier barriers. Their alternating panels stay legible at speed.
+    for (const side of [-1, 1]) {
+      this.addBox([0.48, 1.15, 156], [side * 11.65, 1.05, -20], 0x274c61);
+      this.addBox([0.12, 0.2, 156], [side * 11.35, 2.25, -20], 0x43dff3);
+      for (let z = -94; z <= 54; z += 12)
+        this.addBox([0.12, 0.72, 0.28], [side * 11.35, 1.05, z], 0xb3f4ff);
+    }
+    for (const end of [-1, 1]) {
+      const z = end < 0 ? -97.65 : 57.65;
+      this.addBox([24, 1.15, 0.48], [0, 1.05, z], 0x274c61);
+      this.addBox([24, 0.2, 0.12], [0, 2.25, z + (end < 0 ? 0.3 : -0.3)], 0x43dff3);
+    }
+    this.addBox([23.4, 0.1, 155.4], [0, 0.02, -20], 0x253d52);
+    this.addBox([0.18, 0.025, 154], [-9.4, 0.085, -20], 0x40dcf3);
+    this.addBox([0.18, 0.025, 154], [9.4, 0.085, -20], 0x40dcf3);
+    this.addBox([0.12, 0.025, 154], [0, 0.085, -20], 0xb6e9fa);
+    this.addBox([24, 0.32, 0.35], [0, -0.56, 58.1], 0xf5bf67);
+    for (let z = -94; z <= 55; z += 6) this.addChevron(z);
     this.addClouds();
     scene.add(this.group);
     this.group.visible = false;

@@ -46,7 +46,7 @@ function insideGoalTunnel(x: number, y: number, z: number, inset = 0) {
 export class Simulation {
   world: RAPIER.World;
   private arenaColliders: RAPIER.Collider[];
-  private ringPlatform: RAPIER.Collider;
+  private ringPlatform: RAPIER.Collider[];
   private ringCourseEnabled = false;
   private ringSpawn = { x: 0, y: 0.36, z: 51 };
   cars: Car[];
@@ -89,7 +89,7 @@ export class Simulation {
     this.world.numSolverIterations = 8;
     this.arenaColliders = createArena(this.world, flat);
     this.ringPlatform = createRingPlatform(this.world);
-    this.ringPlatform.setCollisionGroups(0);
+    for (const collider of this.ringPlatform) collider.setCollisionGroups(0);
     this.cars = players.map(() => new Car(this.world));
     this.velocities = players.map(() => new Vector3());
     this.relative = players.map(() => new Vector3());
@@ -130,7 +130,8 @@ export class Simulation {
     this.ringSpawn = spawn;
     for (const collider of this.arenaColliders)
       collider.setCollisionGroups(enabled ? 0 : 0xffffffff);
-    this.ringPlatform.setCollisionGroups(enabled ? 0xffffffff : 0);
+    for (const collider of this.ringPlatform)
+      collider.setCollisionGroups(enabled ? 0xffffffff : 0);
   }
   reset() {
     for (const c of this.cars) {
@@ -419,7 +420,22 @@ export class Simulation {
       c.pose.after();
     });
     this.ballPose.after();
-    if (!this.ringCourseEnabled && !this.flatArena) this.recoverEscapedBodies();
+    if (this.ringCourseEnabled) this.recoverRingEscape();
+    else if (!this.flatArena) this.recoverEscapedBodies();
+  }
+  private recoverRingEscape() {
+    for (const car of this.cars) {
+      if (!car.active || !car.body.isEnabled()) continue;
+      const p = car.body.translation();
+      // Keep the course inside its visible deck and prevent corner/collider
+      // tunnelling from launching a car into the disabled stadium shell.
+      // Test the full car center against the physical deck footprint. The
+      // larger margin accounts for the car body before it can cross a rail.
+      if (Math.abs(p.x) <= 11.1 && p.z >= -96.9 && p.z <= 56.9 && p.y >= -1.5 && p.y <= 35) continue;
+      const boost = car.boost;
+      car.reset(this.ringSpawn.x, this.ringSpawn.z, 0, this.ringSpawn.y);
+      car.boost = boost;
+    }
   }
   private recoverEscapedBodies() {
     for (const car of this.cars) {
@@ -427,8 +443,8 @@ export class Simulation {
       const p = car.body.translation();
       if (
         p.y >= -2.5 &&
-        (insideRoundedArena(p.x, p.z) ||
-          insideGoalTunnel(p.x, p.y, p.z))
+        (insideRoundedArena(p.x, p.z, 0.65) ||
+          insideGoalTunnel(p.x, p.y, p.z, 0.65))
       )
         continue;
       const boost = car.boost,

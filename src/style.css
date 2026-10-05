@@ -1419,6 +1419,8 @@ output {
   height: clamp(130px, 28vh, 300px);
   min-width: 0;
 }
+.cpu-level-control { display:flex; align-items:center; justify-content:center; gap:12px; color:#b9e5ed; letter-spacing:.12em; font-weight:700; }
+.cpu-level-control select { padding:10px 14px; color:#effaff; background:#17344a; border:1px solid #6ca9c2; font:inherit; }
 #settings[open] {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
