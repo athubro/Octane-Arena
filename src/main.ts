@@ -620,6 +620,10 @@ async function boot() {
                   car,
                   simulation.ball.translation(),
                   simulation.clock,
+                  simulation.ball.linvel(),
+                  simulation.cars.filter(
+                    (other) => other.active && other.team !== car.team,
+                  ),
                 )
               : (networkGame?.inputs[car.id] ?? neutral()),
         );
@@ -732,6 +736,7 @@ async function boot() {
                     simulation.ball.translation(),
                     simulation.clock,
                     simulation.ball.linvel(),
+                    [simulation.cars[0]],
                   ),
             ]);
           if (match.mode === "rings") {

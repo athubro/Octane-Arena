@@ -43,6 +43,45 @@ function insideGoalTunnel(x: number, y: number, z: number, inset = 0) {
     y <= goalHeight + goalLip - inset
   );
 }
+function carInsideArenaEnvelope(car: Car, x: number, z: number) {
+  const { halfWidth, halfLength, corner } = P.arena;
+  const dimensions = bodies[car.bodyId];
+  const q = car.body.rotation();
+  const right = new Vector3(1, 0, 0).applyQuaternion(
+    new Quaternion(q.x, q.y, q.z, q.w),
+  );
+  const forward = new Vector3(0, 0, -1).applyQuaternion(
+    new Quaternion(q.x, q.y, q.z, q.w),
+  );
+  const halfX =
+      Math.abs(right.x) * dimensions.halfWidth +
+      Math.abs(forward.x) * dimensions.halfLength,
+    halfZ =
+      Math.abs(right.z) * dimensions.halfWidth +
+      Math.abs(forward.z) * dimensions.halfLength,
+    ax = Math.abs(x),
+    az = Math.abs(z),
+    cornerX = halfWidth - corner,
+    cornerZ = halfLength - corner,
+    margin = 0.05;
+
+  // Expand the straight walls by the rotated car footprint. At the rounded
+  // corners, expand along the local wall normal instead of using one large
+  // radius for every direction.
+  if (ax <= cornerX && az <= cornerZ) return true;
+  if (ax <= cornerX) return az <= halfLength + halfZ + margin;
+  if (az <= cornerZ) return ax <= halfWidth + halfX + margin;
+  const dx = ax - cornerX,
+    dz = az - cornerZ,
+    distance = Math.hypot(dx, dz);
+  if (distance <= corner || distance === 0) return true;
+  const nx = dx / distance,
+    nz = dz / distance,
+    support =
+      Math.abs(nx * right.x + nz * right.z) * dimensions.halfWidth +
+      Math.abs(nx * forward.x + nz * forward.z) * dimensions.halfLength;
+  return distance <= corner + support + margin;
+}
 export class Simulation {
   world: RAPIER.World;
   private arenaColliders: RAPIER.Collider[];
@@ -431,7 +470,14 @@ export class Simulation {
       // tunnelling from launching a car into the disabled stadium shell.
       // Test the full car center against the physical deck footprint. The
       // larger margin accounts for the car body before it can cross a rail.
-      if (Math.abs(p.x) <= 11.1 && p.z >= -96.9 && p.z <= 56.9 && p.y >= -1.5 && p.y <= 35) continue;
+      if (
+        Math.abs(p.x) <= 11.1 &&
+        p.z >= -96.9 &&
+        p.z <= 56.9 &&
+        p.y >= -1.5 &&
+        p.y <= 35
+      )
+        continue;
       const boost = car.boost;
       car.reset(this.ringSpawn.x, this.ringSpawn.z, 0, this.ringSpawn.y);
       car.boost = boost;
@@ -443,11 +489,18 @@ export class Simulation {
       const p = car.body.translation();
       if (
         p.y >= -2.5 &&
-        // This is an escape fallback, so test the car center against the
-        // arena expanded by the car's footprint. An inset here classified a
-        // normal wall contact as an escape and teleported the car on impact.
-        (insideRoundedArena(p.x, p.z, -P.car.halfLength) ||
-          insideGoalTunnel(p.x, p.y, p.z, -P.car.halfLength))
+        (carInsideArenaEnvelope(car, p.x, p.z) ||
+          insideGoalTunnel(
+            p.x,
+            p.y,
+            p.z,
+            -(
+              Math.max(
+                bodies[car.bodyId].halfWidth,
+                bodies[car.bodyId].halfLength,
+              ) + 0.05
+            ),
+          ))
       )
         continue;
       const boost = car.boost,

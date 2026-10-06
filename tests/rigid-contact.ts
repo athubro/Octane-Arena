@@ -237,6 +237,10 @@ check("high-speed side-wall impact keeps cars inside the arena", () => {
     );
   }
   const x = c.body.translation().x;
+  assert.ok(
+    Math.hypot(c.body.translation().x, c.body.translation().z) > 30,
+    "ordinary side-wall contact must not teleport the car to kickoff",
+  );
   s.dispose();
   return { x };
 });
@@ -247,6 +251,28 @@ check("cars already outside a side wall are returned inside the arena", () => {
   s.step([neutral(), neutral()]);
   const x = c.body.translation().x;
   assert.ok(Math.abs(x) <= P.arena.halfWidth + 0.25, `car escaped to x=${x}`);
+  s.dispose();
+  return { x };
+});
+check("standing in the field does not trigger escape recovery", () => {
+  const s = fixture(),
+    c = s.cars[0];
+  c.reset(0, 0, 0);
+  step(s, {}, 360);
+  const p = c.body.translation();
+  assert.equal(c.demolitionState, "active");
+  assert.ok(Math.hypot(p.x, p.z) < 0.1, `car moved to (${p.x}, ${p.z})`);
+  s.dispose();
+  return { x: p.x, y: p.y, z: p.z };
+});
+check("normal side-wall clearance does not trigger escape recovery", () => {
+  const s = fixture(),
+    c = s.cars[0];
+  c.reset(P.arena.halfWidth - 0.44, 0, 0);
+  step(s, {}, 360);
+  const x = c.body.translation().x;
+  assert.equal(c.demolitionState, "active");
+  assert.ok(x > P.arena.halfWidth - 1, `wall-side car was moved to x=${x}`);
   s.dispose();
   return { x };
 });
