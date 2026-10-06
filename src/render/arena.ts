@@ -852,6 +852,17 @@ function drawNeoTokyo(parent: T.Object3D) {
       metalness: 0.25,
     });
   parent.add(city);
+  // Use the supplied still of Neo Tokyo as a distant skyline panel beyond
+  // the end of the arena. Keep it as a real static image rather than a
+  // procedural stand-in.
+  const skyline = new T.TextureLoader().load("/assets/neo-tokyo-standard.webp");
+  skyline.colorSpace = T.SRGBColorSpace;
+  const skylinePanel = new T.Mesh(
+    new T.PlaneGeometry(88, 49.6),
+    new T.MeshBasicMaterial({ map: skyline, toneMapped: false }),
+  );
+  skylinePanel.position.set(0, 22, -P.arena.halfLength - 43);
+  city.add(skylinePanel);
   for (const side of [-1, 1]) {
     for (let i = 0; i < 10; i++) {
       const z = -48 + i * 10.5,
@@ -896,10 +907,9 @@ function drawNeoTokyo(parent: T.Object3D) {
       box(city, [0.32, 0.2, 16], [side * 43.5, 27, z], trim).castShadow = false;
     }
     box(city, [0.45, 0.45, 108], [side * 43, 0.15, 0], trim).castShadow = false;
-    // Low garden planters and lightweight image canopy cards give the skyline
-    // a softer, more lived-in edge without adding dense geometry.
+    // Keep the low planters and canopy cards beyond the playable field.
     for (let i = 0; i < 9; i++) {
-      const z = -47 + i * 11.5, x = side * (P.arena.halfWidth - 1.1);
+      const z = -47 + i * 11.5, x = side * (P.arena.halfWidth + 1.1);
       box(city, [1.5, 0.42, 3.4], [x, 0.2, z], structure).castShadow = false;
       const trunk = new T.Mesh(new T.CylinderGeometry(0.13, 0.22, 2.2, 6), structure);
       trunk.position.set(x, 1.45, z); trunk.castShadow = false; city.add(trunk);
