@@ -98,17 +98,52 @@ function cityFacadeTexture() {
   canvas.width = 256; canvas.height = 512;
   const ctx = canvas.getContext("2d")!;
   const g = ctx.createLinearGradient(0, 0, 256, 512);
-  g.addColorStop(0, "#9aadb0"); g.addColorStop(.38, "#425968"); g.addColorStop(1, "#172b3b");
+  g.addColorStop(0, "#aeb8b5"); g.addColorStop(.22, "#667b7e"); g.addColorStop(.55, "#304653"); g.addColorStop(1, "#172b3b");
   ctx.fillStyle = g; ctx.fillRect(0, 0, 256, 512);
+  // A baked, still façade image: concrete bays, recessed dark glazing,
+  // window reflections and subtle weathering. One small texture is shared by
+  // every tower, so this adds detail without adding draw calls or animation.
+  for (let y = 0; y < 512; y += 128) {
+    ctx.fillStyle = "rgba(220,229,218,.12)"; ctx.fillRect(0, y, 256, 7);
+    ctx.fillStyle = "rgba(8,19,27,.23)"; ctx.fillRect(0, y + 8, 256, 5);
+  }
   for (let x = 8; x < 256; x += 34) {
-    ctx.fillStyle = "#d7d8ce"; ctx.fillRect(x, 0, 7, 512);
+    ctx.fillStyle = "#aebbb5"; ctx.fillRect(x, 0, 7, 512);
     for (let y = 10; y < 512; y += 30) {
-      ctx.fillStyle = (x + y) % 5 ? "rgba(20,48,64,.86)" : "rgba(250,185,111,.58)";
-      ctx.fillRect(x + 10, y, 20, 21);
-      ctx.strokeStyle = "rgba(225,238,235,.34)"; ctx.strokeRect(x + 10, y, 20, 21);
+      ctx.fillStyle = "rgba(6,17,25,.76)"; ctx.fillRect(x + 9, y - 1, 22, 23);
+      const lit = (x * 3 + y) % 11 === 0;
+      const glass = ctx.createLinearGradient(x + 10, y, x + 30, y + 20);
+      glass.addColorStop(0, lit ? "#d7b77d" : "#608091");
+      glass.addColorStop(.45, lit ? "#77715e" : "#203b4c");
+      glass.addColorStop(1, lit ? "#a18b68" : "#456475");
+      ctx.fillStyle = glass; ctx.fillRect(x + 11, y + 1, 18, 18);
+      ctx.fillStyle = "rgba(225,241,238,.28)"; ctx.fillRect(x + 13, y + 2, 2, 16);
+      ctx.fillStyle = "rgba(11,24,32,.82)"; ctx.fillRect(x + 19, y + 1, 1, 18);
+      ctx.fillStyle = "rgba(198,213,207,.58)"; ctx.fillRect(x + 9, y + 21, 22, 2);
     }
   }
   const t = new T.CanvasTexture(canvas); t.colorSpace = T.SRGBColorSpace; return t;
+}
+function cityBillboardTexture(index: number) {
+  const canvas = document.createElement("canvas"); canvas.width = 512; canvas.height = 256;
+  const ctx = canvas.getContext("2d")!;
+  const palettes = [["#132b36", "#64e8e2", "#f5b66d"], ["#301b2b", "#ff668d", "#ffd27b"], ["#102638", "#54cfff", "#eee8d5"]];
+  const [base, neon, warm] = palettes[index % palettes.length];
+  const bg = ctx.createLinearGradient(0, 0, 512, 256);
+  bg.addColorStop(0, base); bg.addColorStop(1, "#080f19");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 512, 256);
+  ctx.fillStyle = "rgba(220,232,220,.12)";
+  for (let x = 0; x < 512; x += 18) ctx.fillRect(x, 0, 1, 256);
+  ctx.strokeStyle = neon; ctx.lineWidth = 7; ctx.strokeRect(12, 12, 488, 232);
+  ctx.fillStyle = warm; ctx.fillRect(28, 32, 9, 190);
+  ctx.fillStyle = neon; ctx.font = "bold 33px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText(index % 2 ? "TOKYO 24" : "NEO DISTRICT", 58, 82);
+  ctx.fillStyle = "#e8e6d9"; ctx.font = "bold 64px sans-serif";
+  ctx.fillText(index % 3 === 0 ? "光" : index % 3 === 1 ? "東京" : "夜", 58, 164);
+  ctx.fillStyle = warm; ctx.font = "18px sans-serif"; ctx.fillText("CITY • NIGHT MARKET • EST. 2049", 180, 151);
+  ctx.fillStyle = "rgba(220,239,234,.7)"; ctx.font = "13px sans-serif"; ctx.fillText("OPEN ALL NIGHT   /   03:17", 180, 185);
+  const texture = new T.CanvasTexture(canvas); texture.colorSpace = T.SRGBColorSpace; texture.anisotropy = 4;
+  return texture;
 }
 function treeCanopyTexture() {
   const canvas = document.createElement("canvas"); canvas.width = canvas.height = 128;
@@ -828,6 +863,20 @@ function drawNeoTokyo(parent: T.Object3D) {
       facadePanel.position.set(x - side * (width / 2 + 0.025), height / 2, z);
       facadePanel.rotation.y = -side * Math.PI / 2;
       city.add(facadePanel);
+      if (i % 3 === 0) {
+        const poster = new T.Mesh(
+          new T.PlaneGeometry(3.15, 1.58),
+          new T.MeshBasicMaterial({
+            map: cityBillboardTexture(i),
+            side: T.DoubleSide,
+            toneMapped: false,
+          }),
+        );
+        poster.position.set(x - side * (width / 2 + 0.075), height * 0.58, z);
+        poster.rotation.y = -side * Math.PI / 2;
+        poster.castShadow = false;
+        city.add(poster);
+      }
       box(city, [width + 0.4, 0.3, 8.3], [x, height + 0.15, z], trim).castShadow = false;
       for (let level = 1.8; level < height - 1; level += 2.8) {
         box(
