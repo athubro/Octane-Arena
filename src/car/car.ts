@@ -45,11 +45,20 @@ export class Car {
   private contactGap = 1;
   contactState: "surface" | "transition" | "air" = "air";
   aerialControl = 1;
+  private proRankedCpu = false;
+  get maxLinearSpeed() {
+    return P.car.maxSpeed * (this.proRankedCpu ? 1.24 : 1);
+  }
+  setProRankedCpu(enabled: boolean) {
+    this.proRankedCpu = enabled && this.controller === "bot";
+    if (this.proRankedCpu) this.boost = 100;
+  }
   get recovering() {
     return this.recovery > 0;
   }
   get angularLimit() {
-    return this.jump.flipLeft > 0 ? P.jump.flipMaxAngular : P.car.maxAngular;
+    return (this.jump.flipLeft > 0 ? P.jump.flipMaxAngular : P.car.maxAngular) *
+      (this.proRankedCpu ? 1.22 : 1);
   }
   private surfaceForward = new Vector3();
   private surfaceRight = new Vector3();
@@ -302,7 +311,7 @@ export class Car {
         : leavingByJump
           ? 1
           : Math.min(1, this.aerialControl + dt / c.airControlBlend);
-    this.boosting = input.boost && this.boost > 0;
+    this.boosting = input.boost && (this.boost > 0 || this.proRankedCpu);
     const throttle = this.boosting ? 1 : input.throttle;
     if (this.contacts) {
       const support = this.contacts >= 2 ? 1 : 0.25;
@@ -384,6 +393,7 @@ export class Car {
         (target - this.w.dot(this.normal)) *
           (c.steeringResponse +
             (slide.yawResponse - c.steeringResponse) * this.handbrake) *
+          (this.proRankedCpu ? 1.3 : 1) *
           (this.impactTime > 0 ? 0.3 : 1),
       );
       this.angular.multiplyScalar(support);
@@ -409,12 +419,18 @@ export class Car {
         this.angular
           .addScaledVector(
             this.right,
-            -input.pitch * c.airPitch * pitchScale * this.aerialControl,
+            -input.pitch * c.airPitch * pitchScale * this.aerialControl *
+              (this.proRankedCpu ? 1.3 : 1),
           )
-          .addScaledVector(this.up, -input.yaw * c.airYaw * this.aerialControl)
+          .addScaledVector(
+            this.up,
+            -input.yaw * c.airYaw * this.aerialControl *
+              (this.proRankedCpu ? 1.3 : 1),
+          )
           .addScaledVector(
             this.forward,
-            input.roll * c.airRoll * this.aerialControl,
+            input.roll * c.airRoll * this.aerialControl *
+              (this.proRankedCpu ? 1.3 : 1),
           )
           .addScaledVector(this.w, -c.airDamping * this.aerialControl);
       }
@@ -422,9 +438,11 @@ export class Car {
     if (this.boosting) {
       this.acceleration.addScaledVector(
         this.forward,
-        this.grounded ? c.boostGround : c.boostAir,
+        (this.grounded ? c.boostGround : c.boostAir) *
+          (this.proRankedCpu ? 1.45 : 1),
       );
-      this.boost = Math.max(0, this.boost - c.boostUse * dt);
+      if (!this.proRankedCpu)
+        this.boost = Math.max(0, this.boost - c.boostUse * dt);
     }
     const action = this.jump.step(
       this.recovering ? { ...input, jump: false } : input,
@@ -438,7 +456,7 @@ export class Car {
       this.grounded = false;
     }
     if (action === "dodge") {
-      const ratio = Math.abs(this.forwardSpeed) / c.maxSpeed;
+      const ratio = Math.abs(this.forwardSpeed) / this.maxLinearSpeed;
       const forward2 = this.forward.clone().setY(0);
       if (forward2.lengthSq() < 0.001) forward2.set(0, 0, -1);
       forward2.normalize();
@@ -499,7 +517,7 @@ export class Car {
       );
       this.recovery = Math.max(0, this.recovery - dt);
     }
-    this.v.addScaledVector(this.acceleration, dt).clampLength(0, c.maxSpeed);
+    this.v.addScaledVector(this.acceleration, dt).clampLength(0, this.maxLinearSpeed);
     b.setLinvel(this.v, true);
     this.w.addScaledVector(this.angular, dt).clampLength(0, this.angularLimit);
     b.setAngvel(this.w, true);

@@ -24,6 +24,7 @@ export class Match {
   goTime = 0;
   message = "";
   overtime = false;
+  rankedCpuCannotLose = false;
   lastGoal: { scorerId: string; team: number; ownGoal: boolean } | null = null;
   goalFocus: { x: number; y: number; z: number } | null = null;
   private resumePhase: Phase = "playing";
@@ -130,6 +131,8 @@ export class Match {
     }
   }
   finish() {
+    if (this.rankedCpuCannotLose && this.score[1] <= this.score[0])
+      this.score[1] = this.score[0] + 1;
     this.phase = "finished";
     this.message =
       this.score[0] > this.score[1]

@@ -455,7 +455,7 @@ export class Simulation {
     cap(this.ball, P.ball.maxSpeed, P.ball.maxAngular);
     this.cars.forEach((c) => {
       c.constrainSurface(true);
-      cap(c.body, P.car.maxSpeed, c.angularLimit);
+      cap(c.body, c.maxLinearSpeed, c.angularLimit);
       c.pose.after();
     });
     this.ballPose.after();

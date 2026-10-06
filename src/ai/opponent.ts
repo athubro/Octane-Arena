@@ -88,13 +88,24 @@ export class Opponent {
       ball.y + ballVelocity.y * lead,
       ball.z + ballVelocity.z * lead,
     );
+    // Team 0 defends +Z; team 1 defends -Z. When the ball is in the bot's
+    // defensive third or moving toward its goal, clear it toward the far wing.
+    const ownGoalSign = car.team === 0 ? 1 : -1;
+    const ownGoalDanger =
+      ownGoalSign * ball.z > P.arena.halfLength - 18 ||
+      (ownGoalSign * ballVelocity.z > 9 &&
+        ownGoalSign * ball.z > P.arena.halfLength - 30);
+    if (ownGoalDanger)
+      shotTargetX =
+        ball.x >= 0
+          ? -P.arena.goalHalf * 1.7
+          : P.arena.goalHalf * 1.7;
+    const attackingGoalZ = -ownGoalSign * (P.arena.halfLength + 5);
     this.attack
       .set(
         shotTargetX - this.predictedBall.x,
         0,
-        car.team === 0
-          ? -(P.arena.halfLength + 5 - this.predictedBall.z)
-          : P.arena.halfLength + 5 - this.predictedBall.z,
+        attackingGoalZ - this.predictedBall.z,
       )
       .normalize();
 
@@ -148,9 +159,11 @@ export class Opponent {
     const directCommit = closeShot || (skill > 0.78 && time < this.directCommitUntil);
     if (directCommit) {
       this.target.set(
-        ball.x + ballVelocity.x * 0.035,
+        ball.x + ballVelocity.x * 0.035 - this.attack.x * 1.35,
         0,
-        ball.z + ballVelocity.z * 0.035,
+        ball.z +
+          ballVelocity.z * 0.035 -
+          this.attack.z * (ownGoalDanger ? 1.9 : 1.35),
       );
     }
 
@@ -222,7 +235,8 @@ export class Opponent {
     if (reverse) c.steer = -c.steer;
     c.slide = absAngle > 0.9 && Math.abs(car.forwardSpeed) > 7 &&
       (skill < 0.85 || currentBallDistance > 6);
-    const speedLimit = 9 + skill * 14;
+    const speedLimit =
+      skill >= 0.99 ? car.maxLinearSpeed * 0.9 : 9 + skill * 14;
     if (!reverse && car.forwardSpeed > speedLimit && absAngle < 0.7)
       c.throttle = 0;
 

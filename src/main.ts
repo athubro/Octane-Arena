@@ -313,9 +313,13 @@ async function boot() {
       },
       { id: "bot", name: opponent.name, team: 1, controller: "bot" },
     ]);
+    simulation.cars.forEach((car) => car.setProRankedCpu(false));
     document.getElementById("bot-tag")!.textContent = opponent.name;
     activePartyGameId = null;
+    const proRankedCpu = mode === "bot" && rankedQueue && rankedBot.level === 10;
+    match.rankedCpuCannotLose = proRankedCpu;
     match.start(simulation, mode);
+    if (proRankedCpu) simulation.cars[1]?.setProRankedCpu(true);
     if (mode === "rings") {
       simulation.ballCollider.setCollisionGroups(0);
       simulation.ball.setEnabled(false);
@@ -352,6 +356,7 @@ async function boot() {
         { id: "bot-relay", name: "RELAY", team: 1, controller: "bot" },
       );
     simulation.configurePlayers(roster);
+    simulation.cars.forEach((car) => car.setProRankedCpu(false));
     updatePreset();
     members.forEach((player, i) =>
       replaceCarVisual(
@@ -365,6 +370,7 @@ async function boot() {
       replaceCarVisual(roster.length - 1, garage.current, "#ffb654");
     }
     activePartyGameId = game.id;
+    match.rankedCpuCannotLose = false;
     dismissedPartyGameId = null;
     lastRemoteSnapshot = -1;
     lastRemoteSnapshotAt = 0;
