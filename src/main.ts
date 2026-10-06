@@ -9,6 +9,7 @@ import { FixedLoop } from "./physics/loop";
 import { Input } from "./input/input";
 import { Opponent } from "./ai/opponent";
 import { Match } from "./game/match";
+import { GoalReplay, type ReplayFrame } from "./game/goal-replay";
 import { RankedBotRating } from "./game/ranked-bot";
 import { Pads } from "./game/pads";
 import { GameCamera } from "./camera/camera";
@@ -70,6 +71,7 @@ async function boot() {
     opponent = new Opponent(),
     botBrains = simulation.cars.map(() => new Opponent()),
     match = new Match(),
+    goalReplay = new GoalReplay(),
     ringChallenge = new RingChallenge(),
     pads = new Pads(),
     audio = new GameAudio();
@@ -253,6 +255,7 @@ async function boot() {
     lastRemoteSnapshotAt = 0,
     networkSequence = 0,
     lastNetworkSend = 0;
+  let goalReplayPending = false;
   let pendingPartyJumpUntil = 0,
     partyJumpWasDown = false;
   const leaveDialog = document.createElement("dialog");
@@ -283,6 +286,8 @@ async function boot() {
         ? "rings"
         : "bot",
   ) => {
+    goalReplay.reset();
+    goalReplayPending = false;
     ui.modes(false);
     arena.setField(selectedField);
     simulation.setRingCourse(mode === "rings", RingChallenge.startingPosition);
@@ -328,6 +333,8 @@ async function boot() {
       party.message = "YOU ARE NOT A PARTICIPANT IN THIS MATCH";
       return;
     }
+    goalReplay.reset();
+    goalReplayPending = false;
     const members = [
       local,
       ...game.players.filter((player) => player.id !== local.id),
@@ -388,6 +395,8 @@ async function boot() {
     )
       void party.action("endMatch");
     if (activePartyGameId) dismissedPartyGameId = activePartyGameId;
+    goalReplay.reset();
+    goalReplayPending = false;
     activePartyGameId = null;
     leaveDialog.close();
     ui.leaveConfirmation = false;
@@ -598,6 +607,7 @@ async function boot() {
     ringCourse.setVisible(match.mode === "rings" && match.phase !== "home");
     for (const pad of padMeshes) pad.visible = match.mode !== "rings";
     const controls = input.sample();
+    const skipReplayPressed = input.take("KeyX");
     const networkGame = party.state?.game ?? null;
     const remotePartyInput =
       match.mode === "party" &&
@@ -651,8 +661,11 @@ async function boot() {
       if (previousReset !== match.resetSequence) {
         resetEffects();
         cameraControl.reset();
+        goalReplay.reset();
+        goalReplayPending = false;
       }
       if (previousPhase === "playing" && match.phase === "goal") {
+        goalReplayPending = true;
         const origin = new T.Vector3().copy(simulation.ball.translation()),
           color = origin.z < 0 ? 0x69e9ff : 0xffb654;
         explosion.trigger(origin, color);
@@ -836,12 +849,17 @@ async function boot() {
           pads.reset();
           cameraControl.reset();
         }
+        if (match.resetSequence !== resetSequence) {
+          goalReplay.reset();
+          goalReplayPending = false;
+        }
         if (
           phase === "countdown" &&
           Math.ceil(match.countdown) !== countdownNumber
         )
           audio.tone(match.phase === "playing" ? 760 : 420, 0.12, 0.08, "sine");
         if (phase === "playing" && match.phase === "goal") {
+          goalReplayPending = true;
           audio.tone(100, 1.3, 0.2, "sawtooth");
           audio.tone(660, 0.9, 0.1, "triangle");
           const origin = new T.Vector3().copy(simulation.ball.translation()),
@@ -907,6 +925,33 @@ async function boot() {
     simulation.ballPose.render(ball, alpha);
     animateBall(ball, now / 1000);
     ball.visible = simulation.ball.isEnabled() && match.mode !== "rings";
+    let replayFrame: ReplayFrame | null = null;
+    if (match.phase === "playing") goalReplay.record(dt, cars, ball);
+    if (goalReplayPending && match.phase === "goal") {
+      goalReplay.record(dt, cars, ball, true);
+      goalReplayPending = false;
+      if (goalReplay.start())
+        match.freeze = Math.max(match.freeze, goalReplay.duration + 0.35);
+    }
+    if (skipReplayPressed && goalReplay.active) {
+      goalReplay.skip();
+      cameraControl.reset();
+      if (match.mode !== "party" || party.state?.hostId === party.playerId)
+        match.freeze = 0;
+    }
+    if (goalReplay.presenting)
+      replayFrame = goalReplay.advance(match.phase === "goal" ? dt : 0);
+    if (replayFrame) {
+      replayFrame.cars.forEach((pose, i) => {
+        if (!cars[i]) return;
+        cars[i].position.copy(pose.position);
+        cars[i].quaternion.copy(pose.rotation);
+        cars[i].visible = pose.visible;
+      });
+      ball.position.copy(replayFrame.ball.position);
+      ball.quaternion.copy(replayFrame.ball.rotation);
+      ball.visible = replayFrame.ball.visible && match.mode !== "rings";
+    }
     goalPlanes.update(ball);
     ballShadow.visible = ball.visible;
     if (match.phase === "home") {
@@ -992,7 +1037,16 @@ async function boot() {
       skidMarks[i].update(c, effectDt, match.active && c.body.isEnabled()),
     );
     if (match.phase !== "home") camera.clearViewOffset();
-    if (match.phase !== "home")
+    if (replayFrame) {
+      const focus = replayFrame.ball.position,
+        goalSide = Math.sign(match.goalFocus?.z ?? focus.z) || 1,
+        cameraPosition = focus
+          .clone()
+          .add(new T.Vector3(9, 7, -goalSide * 14));
+      camera.position.lerp(cameraPosition, 1 - Math.exp(-dt * 7));
+      camera.up.set(0, 1, 0);
+      camera.lookAt(focus.x, focus.y + 0.5, focus.z);
+    } else if (match.phase !== "home")
       cameraControl.update(
         cars[0],
         ball,
@@ -1077,6 +1131,7 @@ async function boot() {
       simulation.cars[0].boost,
       cameraControl.ballMode,
       simulation.cars[0].supersonic,
+      goalReplay.active && match.phase === "goal",
     );
     ui.updateRingChallenge(
       ringChallenge.streak,

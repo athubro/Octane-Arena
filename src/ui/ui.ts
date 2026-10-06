@@ -13,7 +13,7 @@ export class UI {
     <section id="modes" class="screen full-screen" hidden><h2>PLAY</h2><div class="mode-grid"><button id="bot-mode" class="mode-card">${icon("bot")}<strong>AGAINST A BOT</strong></button><button id="freeplay-mode" class="mode-card">${icon("freeplay")}<strong>FREE PLAY</strong></button><button id="rings-mode" class="mode-card"><span class="rings-mode-icon" aria-hidden="true">◎</span><strong>RING RUSH</strong><small>FLY THROUGH NUMBERED RINGS IN ORDER. ONE MISS ENDS YOUR STREAK.</small></button><button id="ranked-mode" class="mode-card">${icon("ranked")}<strong>RANKED CPU</strong><small>CHOOSE A CPU LEVEL · EARN CPU ELO ON WINS</small></button><button class="mode-card" disabled title="Friend matches are coming later">${icon("friend")}<strong>AGAINST A FRIEND</strong><i>${icon("lock")}</i></button></div><footer class="screen-footer"><button id="modes-back" class="back-button">← BACK</button></footer></section>
     <section id="fields" class="screen full-screen" hidden><h2>SELECT FIELD</h2><label id="cpu-level-control" class="cpu-level-control" hidden>CPU LEVEL <select id="cpu-level">${Array.from({length:10},(_,i)=>`<option value="${i+1}">LEVEL ${i+1}</option>`).join("")}</select><span id="cpu-elo-label">CPU ELO 0</span></label><div class="field-grid"><button class="field-card lumen-field" data-field="lumen" aria-pressed="true"><strong>LUMEN DISTRICT</strong><small>THE ORIGINAL STADIUM</small></button><button class="field-card neo-field" data-field="neo-tokyo" aria-pressed="false"><strong>NEO TOKYO</strong><small>NEON CITY ARENA</small></button></div><footer class="screen-footer"><button id="fields-back" class="back-button">← MODES</button><button id="field-start" class="nav-button primary">START MATCH</button></footer></section>
     <section id="garage-screen" class="screen full-screen" hidden></section>
-    <div id="hud" hidden><div class="scoreboard"><span id="score-cyan">0</span><time id="clock">5:00</time><span id="score-amber">0</span></div><div id="ring-score" hidden><strong id="ring-streak">0</strong><span>RING STREAK</span><b id="ring-best">BEST 0</b><small id="ring-next">RING 1 / 9</small></div><div id="notice" aria-live="polite"></div><div id="countdown" aria-live="polite"></div><div class="camera-status"><i></i><b id="camera-mode">BALL CAMERA</b></div><div class="boost-hud"><svg viewBox="0 0 160 160" aria-hidden="true"><path class="boost-track" d="M128 128 A68 68 0 1 0 32 128" pathLength="100"/><path id="boost-fill" d="M32 128 A68 68 0 1 1 128 128" pathLength="100"/></svg><div id="boost">100</div><div id="boost-label">BOOST</div></div><div id="bot-tag" hidden></div></div>
+    <div id="hud" hidden><div class="scoreboard"><span id="score-cyan">0</span><time id="clock">5:00</time><span id="score-amber">0</span></div><div id="ring-score" hidden><strong id="ring-streak">0</strong><span>RING STREAK</span><b id="ring-best">BEST 0</b><small id="ring-next">RING 1 / 9</small></div><div id="notice" aria-live="polite"></div><div id="replay-prompt" hidden>GOAL REPLAY · PRESS X TO SKIP</div><div id="countdown" aria-live="polite"></div><div class="camera-status"><i></i><b id="camera-mode">BALL CAMERA</b></div><div class="boost-hud"><svg viewBox="0 0 160 160" aria-hidden="true"><path class="boost-track" d="M128 128 A68 68 0 1 0 32 128" pathLength="100"/><path id="boost-fill" d="M32 128 A68 68 0 1 1 128 128" pathLength="100"/></svg><div id="boost">100</div><div id="boost-label">BOOST</div></div><div id="bot-tag" hidden></div></div>
     <section id="pause" class="modal" hidden><div class="modal-card"><h2>PAUSED</h2><button id="resume" class="nav-button primary">RESUME</button><button id="pause-settings" class="nav-button">SETTINGS</button><button id="pause-controls" class="nav-button">CONTROLS</button><button id="pause-reset" class="nav-button">RESET</button><button id="pause-home" class="nav-button">LEAVE MATCH</button></div></section>
     <section id="result" class="modal" hidden><div class="modal-card"><h2 id="result-title"></h2><p id="result-score"></p><button id="again" class="nav-button primary">PLAY AGAIN</button><button id="home" class="nav-button">HOME</button></div></section><dialog id="settings"></dialog><dialog id="account" aria-label="Account"></dialog><pre id="debug" hidden></pre>`;
   }
@@ -47,7 +47,13 @@ export class UI {
       { duration: 280, easing: "ease-out" },
     );
   }
-  update(m: Match, boost: number, ballCamera: boolean, sonic: boolean) {
+  update(
+    m: Match,
+    boost: number,
+    ballCamera: boolean,
+    sonic: boolean,
+    replaying = false,
+  ) {
     const set = (id: string, text: string) => {
       const e = document.getElementById(id)!;
       if (e.textContent !== text) {
@@ -67,6 +73,7 @@ export class UI {
       }
     };
     const home = m.phase === "home";
+    document.getElementById("replay-prompt")!.hidden = !replaying;
     const ringMode = m.mode === "rings";
     document.getElementById("pause-reset")!.hidden =
       !m.rules.training && !ringMode;
@@ -123,7 +130,10 @@ export class UI {
           ? "GO!"
           : "",
     );
-    set("camera-mode", ballCamera ? "BALL CAMERA" : "CAR CAMERA");
+    set(
+      "camera-mode",
+      replaying ? "GOAL REPLAY" : ballCamera ? "BALL CAMERA" : "CAR CAMERA",
+    );
     set("result-title", m.message);
     set(
       "result-score",
