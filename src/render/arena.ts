@@ -149,52 +149,97 @@ function fieldGroundTexture(kind: "desert" | "rainforest") {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 512;
   const ctx = canvas.getContext("2d")!;
-  const desert = kind === "desert",
-    gradient = ctx.createLinearGradient(0, 0, 512, 512);
-  if (desert) {
-    gradient.addColorStop(0, "#c98a4f");
-    gradient.addColorStop(0.5, "#e3b56d");
-    gradient.addColorStop(1, "#a96d45");
-  } else {
-    gradient.addColorStop(0, "#103d35");
-    gradient.addColorStop(0.5, "#246344");
-    gradient.addColorStop(1, "#102e34");
-  }
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 512, 512);
+  const desert = kind === "desert";
   let seed = desert ? 19071 : 30793;
-  const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000);
-  for (let i = 0; i < 3000; i++) {
-    const x = random() * 512, y = random() * 512, r = 2 + random() * 18;
-    ctx.fillStyle = desert
-      ? i % 2 ? "rgba(255,222,153,.1)" : "rgba(89,48,27,.1)"
-      : i % 2 ? "rgba(131,184,83,.11)" : "rgba(1,19,24,.15)";
-    ctx.beginPath(); ctx.ellipse(x, y, r * (desert ? 2.7 : 1.5), r, random() * 3, 0, Math.PI * 2); ctx.fill();
-  }
+  const random = () =>
+    ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000);
+  const frequencies = [3, 6, 12, 24, 48],
+    noise = frequencies.map((frequency) =>
+      Float32Array.from({ length: frequency * frequency }, random),
+    );
+  const sampleNoise = (u: number, v: number, octave: number) => {
+    const frequency = frequencies[octave],
+      grid = noise[octave],
+      x = u * frequency,
+      y = v * frequency,
+      x0 = Math.floor(x) % frequency,
+      y0 = Math.floor(y) % frequency,
+      x1 = (x0 + 1) % frequency,
+      y1 = (y0 + 1) % frequency,
+      tx = (x - Math.floor(x)) ** 2 * (3 - 2 * (x - Math.floor(x))),
+      ty = (y - Math.floor(y)) ** 2 * (3 - 2 * (y - Math.floor(y))),
+      a = grid[y0 * frequency + x0] * (1 - tx) + grid[y0 * frequency + x1] * tx,
+      b = grid[y1 * frequency + x0] * (1 - tx) + grid[y1 * frequency + x1] * tx;
+    return a * (1 - ty) + b * ty;
+  };
+  const pixels = ctx.createImageData(canvas.width, canvas.height),
+    weights = [0.48, 0.25, 0.14, 0.085, 0.045];
+  for (let y = 0; y < canvas.height; y++)
+    for (let x = 0; x < canvas.width; x++) {
+      const u = x / canvas.width,
+        v = y / canvas.height;
+      let broad = 0;
+      for (let octave = 0; octave < weights.length; octave++)
+        broad += sampleNoise(u, v, octave) * weights[octave];
+      const fine = sampleNoise(u, v, 4),
+        grain = random() - 0.5,
+        duneRipples = desert
+          ? Math.sin(2 * Math.PI * (v * 9 + Math.sin(2 * Math.PI * u * 3) * 0.11))
+          : 0,
+        index = (y * canvas.width + x) * 4;
+      pixels.data[index] = desert
+        ? 205 + (broad - 0.5) * 32 + duneRipples * 7 + grain * 5
+        : 24 + broad * 24 + fine * 8 + grain * 4;
+      pixels.data[index + 1] = desert
+        ? 160 + (broad - 0.5) * 30 + duneRipples * 9 + grain * 4
+        : 63 + broad * 42 + fine * 16 + grain * 5;
+      pixels.data[index + 2] = desert
+        ? 101 + (broad - 0.5) * 24 + duneRipples * 5 + grain * 3
+        : 43 + broad * 28 + fine * 10 + grain * 4;
+      pixels.data[index + 3] = 255;
+    }
+  ctx.putImageData(pixels, 0, 0);
   const texture = new T.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = T.RepeatWrapping;
-  texture.repeat.set(14, 18);
+  texture.repeat.set(desert ? 4 : 6, desert ? 6 : 8);
   texture.colorSpace = T.SRGBColorSpace;
   texture.anisotropy = 8;
   return texture;
 }
 function drawDuneCrown(parent: T.Object3D) {
   const environment = new T.Group(),
-    stone = new T.MeshStandardMaterial({ color: 0xd4a46b, roughness: 0.9 }),
-    capStone = new T.MeshStandardMaterial({ color: 0xe7c48e, roughness: 0.8 }),
+    stone = new T.MeshStandardMaterial({ color: 0xd7b17a, roughness: 0.92 }),
     dune = new T.MeshStandardMaterial({ color: 0xd09b61, roughness: 1 });
   parent.add(environment);
   const pyramid = (x: number, z: number, radius: number, height: number) => {
-    const levels = Math.max(6, Math.round(height / 4)), step = height / levels,
-      geometry = new T.BoxGeometry(1, 1, 1);
-    for (let level = 0; level < levels; level++) {
-      const width = radius * 2 * (1 - level / levels),
-        tier = new T.Mesh(geometry, level === levels - 1 ? capStone : stone);
-      tier.position.set(x, step * (level + 0.5), z);
-      tier.scale.set(width, step * 0.96, width);
-      tier.rotation.y = Math.PI / 4;
-      tier.castShadow = tier.receiveShadow = true;
-      environment.add(tier);
+    const geometry = new T.ConeGeometry(radius * Math.SQRT2, height, 4, 1),
+      pyramidMesh = new T.Mesh(geometry, stone),
+      courses = new T.Group(),
+      courseMaterial = new T.LineBasicMaterial({
+        color: 0x9b7046,
+        transparent: true,
+        opacity: 0.42,
+      });
+    geometry.rotateY(Math.PI / 4);
+    pyramidMesh.position.set(x, height / 2, z);
+    pyramidMesh.castShadow = pyramidMesh.receiveShadow = true;
+    environment.add(pyramidMesh, courses);
+    courses.position.set(x, 0, z);
+    const courseCount = Math.max(5, Math.round(height / 4));
+    for (let level = 1; level < courseCount; level++) {
+      const fraction = level / courseCount,
+        half = radius * (1 - fraction),
+        y = height * fraction,
+        points = [
+          new T.Vector3(-half, y, -half),
+          new T.Vector3(half, y, -half),
+          new T.Vector3(half, y, half),
+          new T.Vector3(-half, y, half),
+        ],
+        geometry = new T.BufferGeometry().setFromPoints(points),
+        line = new T.LineLoop(geometry, courseMaterial);
+      line.renderOrder = 1;
+      courses.add(line);
     }
   };
   // All structures are beyond the end walls; none enter the playable bounds.
@@ -562,6 +607,7 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
     fieldGrounds: Partial<Record<"dune-crown" | "emerald-canopy", T.CanvasTexture>> = {},
     cityEnvironment: T.Group | undefined,
     field: ArenaField = "lumen";
+  const stripeMeshes: T.Mesh[] = [];
   const setField = (field: ArenaField) => {
     const isNeoTokyo = field === "neo-tokyo";
     if (isNeoTokyo) neoGround ??= neoTokyoGroundTexture();
@@ -591,6 +637,7 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
     apexColiseum.visible = field === "apex-coliseum";
     if (cityEnvironment) cityEnvironment.visible = field === "lumen";
     grass.visible = !isNeoTokyo && !isDesert;
+    stripeMeshes.forEach((mesh) => (mesh.visible = !isNeoTokyo && !isCustomGround));
   };
   const stripe = new T.MeshBasicMaterial({
     color: 0x5ac7ac,
@@ -603,6 +650,7 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
     m.rotation.x = -Math.PI / 2;
     m.position.set(0, 0.008, z);
     group.add(m);
+    stripeMeshes.push(m);
   }
   const shell = arenaShell(),
     geo = new T.BufferGeometry();

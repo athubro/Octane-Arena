@@ -132,6 +132,10 @@ export class Simulation {
   private velocities: Vector3[] = [];
   private cooldown: number[] = [];
   private relative: Vector3[] = [];
+  private safeCarTransforms = new Map<
+    Car,
+    { position: Vector3; rotation: Quaternion }
+  >();
   configuredCount: number;
   private readonly flatArena: boolean;
   constructor(
@@ -200,6 +204,7 @@ export class Simulation {
       collider.setCollisionGroups(enabled ? 0xffffffff : 0);
   }
   reset() {
+    this.safeCarTransforms.clear();
     for (const c of this.cars) {
       if (!c.active) {
         c.body.setEnabled(false);
@@ -415,6 +420,16 @@ export class Simulation {
     });
     this.hits = this.hits.filter((h) => (h.age += P.dt) < 0.6);
     this.cars.forEach((c, i) => {
+      if (
+        !this.flatArena &&
+        !this.ringCourseEnabled &&
+        c.active &&
+        c.body.isEnabled()
+      ) {
+        const position = c.body.translation();
+        if (carInsideArenaBounds(c, position.x, position.y, position.z))
+          this.rememberSafeCarTransform(c);
+      }
       c.pose.before();
       if (!passive && c.body.isEnabled())
         c.tick(
@@ -510,17 +525,30 @@ export class Simulation {
       car.boost = boost;
     }
   }
+  private rememberSafeCarTransform(car: Car) {
+    let safe = this.safeCarTransforms.get(car);
+    if (!safe) {
+      safe = { position: new Vector3(), rotation: new Quaternion() };
+      this.safeCarTransforms.set(car, safe);
+    }
+    safe.position.copy(car.body.translation());
+    safe.rotation.copy(car.body.rotation());
+  }
   private recoverEscapedBodies() {
     for (const car of this.cars) {
       if (!car.active || !car.body.isEnabled()) continue;
       const p = car.body.translation();
-      if (carInsideArenaBounds(car, p.x, p.y, p.z)) continue;
+      if (carInsideArenaBounds(car, p.x, p.y, p.z)) {
+        this.rememberSafeCarTransform(car);
+        continue;
+      }
 
       // A missed wall contact must not turn into a kickoff-style respawn.
       // Restore this physics step's known-good transform and cancel only the
       // outward part of the motion that carried the car beyond the boundary.
-      const last = car.pose.previous,
-        lastRotation = car.pose.previousQ;
+      const safe = this.safeCarTransforms.get(car),
+        last = safe?.position ?? car.pose.previous,
+        lastRotation = safe?.rotation ?? car.pose.previousQ;
       if (
         carInsideArenaBounds(
           car,
@@ -546,22 +574,34 @@ export class Simulation {
         car.body.setRotation(lastRotation, true);
         car.body.setLinvel(velocity, true);
         car.pose.snap();
+        this.rememberSafeCarTransform(car);
         continue;
       }
 
-      // Last resort for an already invalid starting transform; keep the
-      // established deterministic team spawn behavior.
-      const boost = car.boost,
-        team = this.cars.filter(
-          (other) => other.active && other.team === car.team,
-        ),
-        slot = team.indexOf(car);
-      car.reset(
-        team.length === 1 ? 0 : (slot - (team.length - 1) / 2) * 12,
-        car.team === 0 ? 26 : -26,
-        car.team === 0 ? 0 : Math.PI,
-      );
-      car.boost = boost;
+      // If no safe sample exists, project this pose back into the rounded
+      // playable footprint. Do not turn a collision recovery into a respawn.
+      const dimensions = bodies[car.bodyId],
+        rotation = new Quaternion().copy(car.body.rotation()),
+        velocity = new Vector3().copy(car.body.linvel());
+      let x = p.x,
+        z = p.z;
+      for (let i = 0; i < 80 && !carInsideArenaEnvelope(car, x, z, rotation); i++) {
+        x *= 0.94;
+        z *= 0.94;
+      }
+      const y = p.y < -2.5 ? Math.max(0.36, dimensions.hitboxY + dimensions.halfHeight) : p.y,
+        outward = new Vector3(p.x - x, p.y - y, p.z - z);
+      if (outward.lengthSq() > 1e-8) {
+        outward.normalize();
+        const outwardSpeed = velocity.dot(outward);
+        if (outwardSpeed > 0)
+          velocity.addScaledVector(outward, -outwardSpeed);
+      }
+      if (p.y < -2.5 && velocity.y < 0) velocity.y = 0;
+      car.body.setTranslation({ x, y, z }, true);
+      car.body.setLinvel(velocity, true);
+      car.pose.snap();
+      this.rememberSafeCarTransform(car);
     }
     const p = this.ball.translation();
     if (

@@ -80,12 +80,26 @@ export class Opponent {
       }
     }
 
-    // Lead the ball farther away, but stop predicting far ahead at close range.
+    // Aim at where the ball will be when the car arrives instead of steering
+    // after its current position. Bound the estimate because wall bounces can
+    // invalidate long linear predictions.
     const currentBallDistance = Math.hypot(ball.x - p.x, ball.z - p.z),
-      lead = 0.025 + skill * Math.min(0.18, currentBallDistance / 110);
+      carVelocity = car.body.linvel(),
+      carSpeed = Math.hypot(carVelocity.x, carVelocity.y, carVelocity.z),
+      arrivalSpeed = Math.max(8, Math.min(25, carSpeed * 0.62 + 8)),
+      arrivalTime = Math.max(
+        0.04,
+        Math.min(0.72, (currentBallDistance - 1.4) / arrivalSpeed),
+      ),
+      lead = skill > 0.45
+        ? arrivalTime
+        : 0.025 + skill * Math.min(0.18, currentBallDistance / 110);
     this.predictedBall.set(
       ball.x + ballVelocity.x * lead,
-      ball.y + ballVelocity.y * lead,
+      Math.max(
+        P.ball.radius,
+        ball.y + ballVelocity.y * lead - 0.5 * P.gravity * lead * lead,
+      ),
       ball.z + ballVelocity.z * lead,
     );
     // Team 0 defends +Z; team 1 defends -Z. When the ball is in the bot's
@@ -229,23 +243,39 @@ export class Opponent {
     const distance = this.local.length();
     const absAngle = Math.abs(angle);
     const reverse = skill < 0.85 && absAngle > 2.35 && distance < 13;
-    // Modulate throttle while turning so the car can actually follow its line.
     c.steer = Math.max(-1, Math.min(1, angle * (1.45 + skill * 0.8)));
-    c.throttle = reverse ? -0.65 : absAngle > 1.4 ? (skill >= 0.85 ? 0.72 : 0.4) : 1;
+    c.throttle = 0;
     if (reverse) c.steer = -c.steer;
-    c.slide = absAngle > 0.9 && Math.abs(car.forwardSpeed) > 7 &&
-      (skill < 0.85 || currentBallDistance > 6);
-    const speedLimit =
-      skill >= 0.99 ? car.maxLinearSpeed * 0.9 : 9 + skill * 14;
-    if (!reverse && car.forwardSpeed > speedLimit && absAngle < 0.7)
-      c.throttle = 0;
+    c.slide =
+      absAngle > (skill >= 0.85 ? 1.2 : 0.85) &&
+      Math.abs(car.forwardSpeed) > (skill >= 0.85 ? 10 : 5) &&
+      distance > (skill >= 0.85 ? 12 : 3.5);
+    // Choose speed from braking distance. The old fixed speed gate only
+    // coasted when fast, so a pro bot kept sliding past its approach point.
+    const maxApproachSpeed =
+      skill >= 0.99
+        ? Math.min(car.maxLinearSpeed * 0.88, P.car.maxSpeed * 1.08)
+        : 8 + skill * 14,
+      distanceToContact = Math.max(0, distance - 1.5),
+      contactSpeed = 6 + skill * 4,
+      turnFactor = Math.max(0.35, 1 - Math.max(0, absAngle - 0.35) * 0.4),
+      desiredSpeed = Math.min(
+        maxApproachSpeed,
+        Math.sqrt(contactSpeed * contactSpeed + 36 * distanceToContact),
+      ) * turnFactor;
+    if (reverse) c.throttle = -0.65;
+    else if (car.forwardSpeed > desiredSpeed + 0.7) c.throttle = -1;
+    else if (car.forwardSpeed < desiredSpeed - 0.7) c.throttle = 1;
+    else if (absAngle > 1.7 && distance > 3) c.throttle = 0.3;
 
     const aligned = absAngle < 0.38 + (1 - skill) * 0.35;
     const boostReserve = 8 + (1 - skill) * 24;
     c.boost =
-      car.forwardSpeed < speedLimit - 1 &&
+      c.throttle > 0 &&
+      car.forwardSpeed < desiredSpeed - 1 &&
       aligned &&
-      distance > (skill >= 0.85 ? 2.8 : 7) &&
+      distance > 7 &&
+      Math.abs(car.lateralSlip) < 4 &&
       car.boost > boostReserve &&
       (skill > 0.35 || time % 5 < 2.2);
     if (nearestOpponent < 7 && skill < 0.85) c.boost = false;
@@ -295,9 +325,18 @@ export class Opponent {
       c.pitch = Math.max(-1, Math.min(1, -pitchError * (1.1 + aerialSkill * 0.55)));
       c.yaw = Math.max(-1, Math.min(1, yawError * (1.05 + aerialSkill * 0.45)));
       c.roll = Math.max(-0.55, Math.min(0.55, car.right.y * 0.55));
-      c.throttle = 1;
-      c.boost = car.boost > 0 && Math.abs(yawError) < 1.05 && Math.abs(pitchError) < 0.9 &&
-        (this.aerialPoint.y > p.y || aerialAge < 0.6);
+      const distanceToIntercept = this.aerialLocal.length(),
+        aerialSpeedLimit = Math.min(
+          car.maxLinearSpeed * 0.8,
+          Math.sqrt(64 + 30 * Math.max(0, distanceToIntercept - 1.5)),
+        );
+      c.throttle = distanceToIntercept > 2.5 ? 1 : 0;
+      c.boost = car.boost > 0 &&
+        distanceToIntercept > 5 &&
+        carSpeed < aerialSpeedLimit &&
+        Math.abs(yawError) < 0.72 &&
+        Math.abs(pitchError) < 0.62 &&
+        (this.aerialPoint.y > p.y || aerialAge < 0.45);
     } else if (!car.grounded) {
       c.pitch = car.forward.y > 0.05 ? 0.3 : -0.22;
       c.roll = car.right.y * 0.65;
