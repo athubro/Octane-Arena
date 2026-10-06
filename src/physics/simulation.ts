@@ -443,8 +443,11 @@ export class Simulation {
       const p = car.body.translation();
       if (
         p.y >= -2.5 &&
-        (insideRoundedArena(p.x, p.z, 0.65) ||
-          insideGoalTunnel(p.x, p.y, p.z, 0.65))
+        // This is an escape fallback, so test the car center against the
+        // arena expanded by the car's footprint. An inset here classified a
+        // normal wall contact as an escape and teleported the car on impact.
+        (insideRoundedArena(p.x, p.z, -P.car.halfLength) ||
+          insideGoalTunnel(p.x, p.y, p.z, -P.car.halfLength))
       )
         continue;
       const boost = car.boost,
