@@ -43,15 +43,19 @@ function insideGoalTunnel(x: number, y: number, z: number, inset = 0) {
     y <= goalHeight + goalLip - inset
   );
 }
-function carInsideArenaEnvelope(car: Car, x: number, z: number) {
+function carInsideArenaEnvelope(
+  car: Car,
+  x: number,
+  z: number,
+  rotation = car.body.rotation(),
+) {
   const { halfWidth, halfLength, corner } = P.arena;
   const dimensions = bodies[car.bodyId];
-  const q = car.body.rotation();
   const right = new Vector3(1, 0, 0).applyQuaternion(
-    new Quaternion(q.x, q.y, q.z, q.w),
+    new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
   );
   const forward = new Vector3(0, 0, -1).applyQuaternion(
-    new Quaternion(q.x, q.y, q.z, q.w),
+    new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
   );
   const halfX =
       Math.abs(right.x) * dimensions.halfWidth +
@@ -81,6 +85,29 @@ function carInsideArenaEnvelope(car: Car, x: number, z: number) {
       Math.abs(nx * right.x + nz * right.z) * dimensions.halfWidth +
       Math.abs(nx * forward.x + nz * forward.z) * dimensions.halfLength;
   return distance <= corner + support + margin;
+}
+function carInsideArenaBounds(
+  car: Car,
+  x: number,
+  y: number,
+  z: number,
+  rotation = car.body.rotation(),
+) {
+  return (
+    y >= -2.5 &&
+    (carInsideArenaEnvelope(car, x, z, rotation) ||
+      insideGoalTunnel(
+        x,
+        y,
+        z,
+        -(
+          Math.max(
+            bodies[car.bodyId].halfWidth,
+            bodies[car.bodyId].halfLength,
+          ) + 0.05
+        ),
+      ))
+  );
 }
 export class Simulation {
   world: RAPIER.World;
@@ -487,22 +514,43 @@ export class Simulation {
     for (const car of this.cars) {
       if (!car.active || !car.body.isEnabled()) continue;
       const p = car.body.translation();
+      if (carInsideArenaBounds(car, p.x, p.y, p.z)) continue;
+
+      // A missed wall contact must not turn into a kickoff-style respawn.
+      // Restore this physics step's known-good transform and cancel only the
+      // outward part of the motion that carried the car beyond the boundary.
+      const last = car.pose.previous,
+        lastRotation = car.pose.previousQ;
       if (
-        p.y >= -2.5 &&
-        (carInsideArenaEnvelope(car, p.x, p.z) ||
-          insideGoalTunnel(
-            p.x,
-            p.y,
-            p.z,
-            -(
-              Math.max(
-                bodies[car.bodyId].halfWidth,
-                bodies[car.bodyId].halfLength,
-              ) + 0.05
-            ),
-          ))
-      )
+        carInsideArenaBounds(
+          car,
+          last.x,
+          last.y,
+          last.z,
+          lastRotation,
+        )
+      ) {
+        const displacement =
+            p.y < -2.5
+              ? new Vector3(0, p.y - last.y, 0)
+              : new Vector3(p.x - last.x, 0, p.z - last.z),
+          velocity = new Vector3().copy(car.body.linvel());
+        if (displacement.lengthSq() > 1e-8) {
+          displacement.normalize();
+          const outwardSpeed = velocity.dot(displacement);
+          if (outwardSpeed > 0)
+            velocity.addScaledVector(displacement, -outwardSpeed);
+        }
+        if (p.y < -2.5 && velocity.y < 0) velocity.y = 0;
+        car.body.setTranslation({ x: last.x, y: last.y, z: last.z }, true);
+        car.body.setRotation(lastRotation, true);
+        car.body.setLinvel(velocity, true);
+        car.pose.snap();
         continue;
+      }
+
+      // Last resort for an already invalid starting transform; keep the
+      // established deterministic team spawn behavior.
       const boost = car.boost,
         team = this.cars.filter(
           (other) => other.active && other.team === car.team,
