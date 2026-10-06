@@ -2,6 +2,7 @@ import { Vector3, Quaternion } from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { bodies, type BodyId } from "../../shared/catalog";
 import { P } from "../config/physics";
+import { activeStaticCollider } from "../physics/query";
 export const wheelRadius = 0.18;
 export const wheelHalfWidth = 0.0575;
 export function wheelMount(id: BodyId, index: number, out = new Vector3()) {
@@ -34,7 +35,7 @@ export function wheelClearance(
     undefined,
     collider,
     body,
-    (col) => col.parent() === null,
+    activeStaticCollider,
   );
   if (!hit || up.dot(hit.normal) < 0.25) return -0.12;
   const axle = new Vector3(
@@ -68,7 +69,7 @@ export function wheelClearance(
       undefined,
       collider,
       body,
-      (col) => col.parent() === null,
+      activeStaticCollider,
     );
     if (!edge || up.dot(edge.normal) < 0.25) continue;
     const axial = Math.min(1, Math.abs(axle.dot(edge.normal)));

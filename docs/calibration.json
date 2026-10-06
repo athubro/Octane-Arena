@@ -84,32 +84,32 @@
   },
   {
     "name": "front strike 2 m/s",
-    "value": 1.9218770265579224,
+    "value": 1.9222675561904907,
     "pass": true
   },
   {
     "name": "glancing strike 2 m/s",
-    "value": 1.2969146827344038,
+    "value": 1.296915042100667,
     "pass": true
   },
   {
     "name": "front strike 10 m/s",
-    "value": 12.675449299233414,
+    "value": 12.675449380440858,
     "pass": true
   },
   {
     "name": "glancing strike 10 m/s",
-    "value": 8.785791541248964,
+    "value": 8.78579141497462,
     "pass": true
   },
   {
     "name": "front strike 20 m/s",
-    "value": 25.44252720175809,
+    "value": 25.442528029605274,
     "pass": true
   },
   {
     "name": "glancing strike 20 m/s",
-    "value": 17.978377078632686,
+    "value": 17.978377210284272,
     "pass": true
   },
   {
@@ -324,7 +324,7 @@
   {
     "name": "complete 5-minute live simulation",
     "value": {
-      "seconds": 500.6166666666667,
+      "seconds": 380.225,
       "score": [
         0,
         1

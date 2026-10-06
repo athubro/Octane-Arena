@@ -4,6 +4,7 @@ import { P, curvature, throttleAcceleration } from "../config/physics";
 import type { PlayerInput } from "../../shared/player";
 import { JumpState } from "./dodge";
 import { Pose } from "../physics/pose";
+import { activeStaticCollider } from "../physics/query";
 import { bodies, type BodyId } from "../game/inventory";
 import { wheelMount } from "./wheels";
 export class Car {
@@ -177,7 +178,7 @@ export class Car {
         undefined,
         this.collider,
         this.body,
-        (col) => col.parent() === null,
+        activeStaticCollider,
       );
       this.wheelContact[i] = false;
       this.wheelHits[i].copy(o).addScaledVector(this.up, -c.rayLength);
@@ -218,7 +219,7 @@ export class Car {
         undefined,
         this.collider,
         b,
-        (col) => col.parent() === null,
+        activeStaticCollider,
       );
       if (support && this.up.dot(this.tmp.copy(support.normal)) < -0.65) {
         this.recovery = 0.4;
@@ -264,7 +265,7 @@ export class Car {
           undefined,
           this.collider,
           b,
-          (col) => col.parent() === null,
+          activeStaticCollider,
         );
         if (hit && this.up.dot(hit.normal) < 0.55) {
           sideSupport = new Vector3().copy(hit.normal);
@@ -561,7 +562,7 @@ export class Car {
         undefined,
         this.collider,
         b,
-        (col) => col.parent() === null,
+        activeStaticCollider,
       );
       if (!hit) continue;
       const normal = new Vector3().copy(hit.normal),
@@ -605,7 +606,7 @@ export class Car {
               undefined,
               this.collider,
               b,
-              (col) => col.parent() === null,
+              activeStaticCollider,
             );
             if (!hit) continue;
             const normal = new Vector3().copy(hit.normal),

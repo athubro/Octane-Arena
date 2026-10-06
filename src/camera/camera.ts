@@ -1,6 +1,7 @@
 import * as T from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Simulation } from "../physics/simulation";
+import { activeStaticCollider } from "../physics/query";
 import { defaults, type CameraSettings } from "../game/settings";
 import { P } from "../config/physics";
 const angleDelta = (a: number, b: number) =>
@@ -119,7 +120,7 @@ export class GameCamera {
       undefined,
       s.cars[0].collider,
       s.cars[0].body,
-      (col) => col.parent() === null,
+      activeStaticCollider,
     );
     let wallAdjusted = false;
     let avoidance = 0;
@@ -178,7 +179,7 @@ export class GameCamera {
           undefined,
           s.cars[0].collider,
           s.cars[0].body,
-          (col) => col.parent() === null,
+          activeStaticCollider,
         );
         const available = obstruction
           ? Math.max(0.4, obstruction.timeOfImpact - 0.3)
@@ -270,7 +271,7 @@ export class GameCamera {
         undefined,
         s.cars[0].collider,
         s.cars[0].body,
-        (col) => col.parent() === null,
+        activeStaticCollider,
       );
       if (obstruction) {
         const normal = new T.Vector3().copy(obstruction.normal);
