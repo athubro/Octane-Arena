@@ -1,6 +1,9 @@
 import type { Match } from "../game/match";
 import type { Profile } from "../game/inventory";
-import { TRAINING_PACKS, type TrainingPackRecords } from "../game/training-packs";
+import {
+  TRAINING_PACKS,
+  type TrainingPackRecords,
+} from "../game/training-packs";
 import { icon } from "./icons";
 export class UI {
   rankedResult = "";
@@ -15,9 +18,9 @@ export class UI {
     <button id="profile" aria-label="Open profile"><div class="avatar">${icon("profile")}</div><div><b id="profile-name">Guest</b><span id="profile-title">Rookie</span></div><div class="level"><small>LEVEL</small><b id="profile-level">1</b></div></button>
     <section id="modes" class="screen full-screen" hidden><h2>PLAY</h2><nav class="mode-tabs" aria-label="Game mode category"><button id="standard-modes-tab" aria-pressed="true">STANDARD</button><button id="extra-modes-tab" aria-pressed="false">EXTRA MODES</button></nav><div class="mode-grid standard-mode-grid"><button id="bot-mode" class="mode-card">${icon("bot")}<strong>AGAINST A BOT</strong></button><button id="freeplay-mode" class="mode-card">${icon("freeplay")}<strong>FREE PLAY</strong></button><button id="training-packs-mode" class="mode-card"><span class="training-pack-emblem" aria-hidden="true">11</span><strong>TRAINING PACKS</strong><small>10 PACKS · 11 SHOTS EACH · SAVE YOUR BEST SCORE</small></button><button id="ranked-mode" class="mode-card">${icon("ranked")}<strong>RANKED CPU</strong><small>CHOOSE A CPU LEVEL · EARN CPU ELO ON WINS</small></button><button class="mode-card" disabled title="Friend matches are coming later">${icon("friend")}<strong>AGAINST A FRIEND</strong><i>${icon("lock")}</i></button></div><div class="mode-grid extra-mode-grid" hidden><button id="rings-mode" class="mode-card"><span class="rings-mode-icon" aria-hidden="true">◎</span><strong>RING RUSH</strong><small>FLY THROUGH NUMBERED RINGS IN ORDER. ONE MISS ENDS YOUR STREAK.</small></button></div><footer class="screen-footer"><button id="modes-back" class="back-button">← BACK</button></footer></section>
     <section id="training-pack-select" class="screen full-screen" hidden><header class="training-pack-header"><h2>TRAINING PACKS</h2><p>Eleven timed shots per pack. Score by finding the called goal before the clock expires.</p></header><div id="training-pack-list" class="training-pack-list"></div><footer class="screen-footer"><button id="packs-back" class="back-button">← MODES</button><span>BEST SCORES SAVE IN THIS BROWSER</span></footer></section>
-    <section id="fields" class="screen full-screen" hidden><h2>SELECT FIELD</h2><label id="cpu-level-control" class="cpu-level-control" hidden>CPU LEVEL <select id="cpu-level">${["ROOKIE","NOVICE","CHALLENGER","COMPETITOR","SKILLED","ADVANCED","EXPERT","ELITE","MASTER","PRO"].map((rank,i)=>`<option value="${i+1}">LEVEL ${i+1} · ${rank}</option>`).join("")}</select><span id="cpu-elo-label">CPU ELO 0</span></label><div class="field-grid"><button class="field-card lumen-field" data-field="lumen" aria-pressed="true"><strong>LUMEN DISTRICT</strong><small>THE ORIGINAL STADIUM</small></button><button class="field-card neo-field" data-field="neo-tokyo" aria-pressed="false"><strong>NEO TOKYO</strong><small>NEON CITY ARENA</small></button><button class="field-card dune-field" data-field="dune-crown" aria-pressed="false"><strong>DUNE CROWN</strong><small>PYRAMIDS AT THE EDGE OF THE DESERT</small></button><button class="field-card rainforest-field" data-field="emerald-canopy" aria-pressed="false"><strong>EMERALD CANOPY</strong><small>TROPICAL RAINFOREST ARENA</small></button><button class="field-card coliseum-field" data-field="apex-coliseum" aria-pressed="false"><strong>APEX COLISEUM</strong><small>PLAY UNDER THE LIGHTS</small></button></div><footer class="screen-footer"><button id="fields-back" class="back-button">← MODES</button><button id="field-start" class="nav-button primary">START MATCH</button></footer></section>
+    <section id="fields" class="screen full-screen" hidden><h2>SELECT FIELD</h2><label id="cpu-level-control" class="cpu-level-control" hidden>CPU LEVEL <select id="cpu-level">${["ROOKIE", "NOVICE", "CHALLENGER", "COMPETITOR", "SKILLED", "ADVANCED", "EXPERT", "ELITE", "MASTER", "PRO"].map((rank, i) => `<option value="${i + 1}">LEVEL ${i + 1} · ${rank}</option>`).join("")}</select><span id="cpu-elo-label">CPU ELO 0</span></label><div class="field-grid"><button class="field-card lumen-field" data-field="lumen" aria-pressed="true"><strong>LUMEN DISTRICT</strong><small>THE ORIGINAL STADIUM</small></button><button class="field-card neo-field" data-field="neo-tokyo" aria-pressed="false"><strong>NEO TOKYO</strong><small>NEON CITY ARENA</small></button><button class="field-card dune-field" data-field="dune-crown" aria-pressed="false"><strong>DUNE CROWN</strong><small>PYRAMIDS AT THE EDGE OF THE DESERT</small></button><button class="field-card rainforest-field" data-field="emerald-canopy" aria-pressed="false"><strong>EMERALD CANOPY</strong><small>TROPICAL RAINFOREST ARENA</small></button><button class="field-card coliseum-field" data-field="apex-coliseum" aria-pressed="false"><strong>APEX COLISEUM</strong><small>PLAY UNDER THE LIGHTS</small></button></div><footer class="screen-footer"><button id="fields-back" class="back-button">← MODES</button><button id="field-start" class="nav-button primary">START MATCH</button></footer></section>
     <section id="garage-screen" class="screen full-screen" hidden></section>
-    <div id="hud" hidden><div class="scoreboard"><span id="score-cyan">0</span><time id="clock">5:00</time><span id="score-amber">0</span></div><div id="ring-score" hidden><strong id="ring-streak">0</strong><span>RING STREAK</span><b id="ring-best">BEST 0</b><small id="ring-next">RING 1 / 9</small></div><section id="training-pack-hud" hidden><header><b id="training-pack-title"></b><span id="training-pack-tier"></span></header><div class="training-pack-hud-row"><strong id="training-pack-shot">SHOT 01 / 11</strong><span id="training-pack-cannon" hidden>◆ CANNON</span></div><div class="training-pack-timer"><i id="training-pack-timer-fill"></i></div><div class="training-pack-hud-row"><span id="training-pack-points">0 POINTS</span><time id="training-pack-time">0.0</time></div><small id="training-pack-message" aria-live="polite"></small></section><div id="notice" aria-live="polite"></div><div id="replay-prompt" hidden>GOAL REPLAY · PRESS X TO SKIP</div><div id="countdown" aria-live="polite"></div><div class="camera-status"><i></i><b id="camera-mode">BALL CAMERA</b></div><div class="boost-hud"><svg viewBox="0 0 160 160" aria-hidden="true"><path class="boost-track" d="M128 128 A68 68 0 1 0 32 128" pathLength="100"/><path id="boost-fill" d="M32 128 A68 68 0 1 1 128 128" pathLength="100"/></svg><div id="boost">100</div><div id="boost-label">BOOST</div></div><div id="bot-tag" hidden></div></div>
+    <div id="hud" hidden><div class="scoreboard"><span id="score-cyan">0</span><time id="clock">5:00</time><span id="score-amber">0</span></div><div id="ring-score" hidden><strong id="ring-streak">0</strong><span>RING STREAK</span><b id="ring-best">BEST 0</b><small id="ring-next">RING 1 / 9</small></div><section id="training-pack-hud" hidden><header><b id="training-pack-title"></b><span id="training-pack-tier"></span></header><div class="training-pack-hud-row"><strong id="training-pack-shot">SHOT 01 / 11</strong><span id="training-pack-target"></span><span id="training-pack-cannon" hidden>◆ CANNON</span></div><div class="training-pack-timer"><i id="training-pack-timer-fill"></i></div><div class="training-pack-hud-row"><span id="training-pack-points">0 POINTS</span><time id="training-pack-time">0.0</time></div><small id="training-pack-message" aria-live="polite"></small></section><div id="notice" aria-live="polite"></div><div id="replay-prompt" hidden>GOAL REPLAY · PRESS X TO SKIP</div><div id="countdown" aria-live="polite"></div><div class="camera-status"><i></i><b id="camera-mode">BALL CAMERA</b></div><div class="boost-hud"><svg viewBox="0 0 160 160" aria-hidden="true"><path class="boost-track" d="M128 128 A68 68 0 1 0 32 128" pathLength="100"/><path id="boost-fill" d="M32 128 A68 68 0 1 1 128 128" pathLength="100"/></svg><div id="boost">100</div><div id="boost-label">BOOST</div></div><div id="bot-tag" hidden></div></div>
     <section id="pause" class="modal" hidden><div class="modal-card"><h2>PAUSED</h2><button id="resume" class="nav-button primary">RESUME</button><button id="pause-settings" class="nav-button">SETTINGS</button><button id="pause-controls" class="nav-button">CONTROLS</button><button id="pause-reset" class="nav-button">RESET</button><button id="pause-home" class="nav-button">LEAVE MATCH</button></div></section>
     <section id="result" class="modal" hidden><div class="modal-card"><h2 id="result-title"></h2><p id="result-score"></p><button id="again" class="nav-button primary">PLAY AGAIN</button><button id="home" class="nav-button">HOME</button></div></section><dialog id="settings"></dialog><dialog id="account" aria-label="Account"></dialog><pre id="debug" hidden></pre>`;
   }
@@ -29,10 +32,18 @@ export class UI {
     if (show) this.modeTab(false);
   }
   modeTab(extra: boolean) {
-    document.querySelector(".standard-mode-grid")?.toggleAttribute("hidden", extra);
-    document.querySelector(".extra-mode-grid")?.toggleAttribute("hidden", !extra);
-    document.getElementById("standard-modes-tab")?.setAttribute("aria-pressed", String(!extra));
-    document.getElementById("extra-modes-tab")?.setAttribute("aria-pressed", String(extra));
+    document
+      .querySelector(".standard-mode-grid")
+      ?.toggleAttribute("hidden", extra);
+    document
+      .querySelector(".extra-mode-grid")
+      ?.toggleAttribute("hidden", !extra);
+    document
+      .getElementById("standard-modes-tab")
+      ?.setAttribute("aria-pressed", String(!extra));
+    document
+      .getElementById("extra-modes-tab")
+      ?.setAttribute("aria-pressed", String(extra));
   }
   fields(show: boolean) {
     this.screen = show ? "fields" : "modes";
@@ -59,6 +70,7 @@ export class UI {
     shot: number;
     total: number;
     score: number;
+    goalTeam: number;
     timer: number;
     timerLimit: number;
     cannon: boolean;
@@ -73,15 +85,19 @@ export class UI {
     document.getElementById("training-pack-tier")!.textContent = view.tier;
     document.getElementById("training-pack-shot")!.textContent =
       `SHOT ${String(Math.min(view.shot + 1, view.total)).padStart(2, "0")} / ${view.total}`;
+    document.getElementById("training-pack-target")!.textContent =
+      `SCORE ${view.goalTeam === 0 ? "CYAN" : "AMBER"}`;
     document.getElementById("training-pack-points")!.textContent =
       `${view.score} ${view.score === 1 ? "POINT" : "POINTS"}`;
     document.getElementById("training-pack-time")!.textContent =
       `${Math.max(0, view.timer).toFixed(1)}s`;
     document.getElementById("training-pack-cannon")!.hidden = !view.cannon;
-    document.getElementById("training-pack-message")!.textContent = view.message;
-    const fraction = view.timerLimit > 0
-      ? Math.max(0, Math.min(1, view.timer / view.timerLimit))
-      : 0;
+    document.getElementById("training-pack-message")!.textContent =
+      view.message;
+    const fraction =
+      view.timerLimit > 0
+        ? Math.max(0, Math.min(1, view.timer / view.timerLimit))
+        : 0;
     document.getElementById("training-pack-timer-fill")!.style.transform =
       `scaleX(${fraction})`;
   }
@@ -200,11 +216,13 @@ export class UI {
       this.trainingPackResult
         ? `TRAINING PACK SCORE ${m.score[0]} / 11`
         : ringMode
-        ? `RINGS ${m.score[0]} · BEST ${m.score[1]}`
-        : `${m.score[0]} — ${m.score[1]}${this.rankedResult}`,
+          ? `RINGS ${m.score[0]} · BEST ${m.score[1]}`
+          : `${m.score[0]} — ${m.score[1]}${this.rankedResult}`,
     );
-    (document.getElementById("again") as HTMLButtonElement).textContent =
-      this.trainingPackResult ? "RETRY PACK" : "PLAY AGAIN";
+    (document.getElementById("again") as HTMLButtonElement).textContent = this
+      .trainingPackResult
+      ? "RETRY PACK"
+      : "PLAY AGAIN";
   }
 
   updateRingChallenge(

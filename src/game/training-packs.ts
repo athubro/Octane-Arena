@@ -34,17 +34,31 @@ export interface TrainingPackRecord {
 
 export type TrainingPackRecords = Record<string, TrainingPackRecord>;
 
-const timerBases = [18, 16.5, 17.25, 15.5, 14.75, 16, 13.75, 14.5, 13, 12.5, 11.75];
+const timerBases = [
+  18, 17.25, 16.5, 15.75, 15, 14.25, 13.5, 12.75, 12, 11.25, 10.5,
+];
 const packNames = [
   ["Rookie Warmup", "EASY", "Clean ground shots with generous time."],
   ["First Touch", "EASY", "Build accuracy from varied starting lanes."],
   ["Angle School", "CASUAL", "Pick your line around changing ball positions."],
   ["Moving Targets", "CASUAL", "Read rolling balls and strike through them."],
-  ["Aerial Class", "INTERMEDIATE", "Take off early and meet the ball in the air."],
+  [
+    "Aerial Class",
+    "INTERMEDIATE",
+    "Take off early and meet the ball in the air.",
+  ],
   ["Crossbar Lab", "ADVANCED", "Control elevated shots under tighter clocks."],
   ["Wall Reads", "HARD", "Recover awkward wall passes and rebounds."],
-  ["Air Control", "VERY HARD", "Track fast cannon launches and aerial crosses."],
-  ["Pressure Cooker", "VERY HARD", "Short clocks, sharp angles, and late reads."],
+  [
+    "Air Control",
+    "VERY HARD",
+    "Track fast cannon launches and aerial crosses.",
+  ],
+  [
+    "Pressure Cooker",
+    "VERY HARD",
+    "Short clocks, sharp angles, and late reads.",
+  ],
   ["Overtime Trials", "PRO", "Eleven demanding shots with the least time."],
 ] as const;
 
@@ -121,15 +135,17 @@ function makeShot(difficulty: number, index: number): TrainingShot {
     ballVZ = goalSign * (4 + difficulty * 0.48);
   }
 
-  const targetX = (((index * 3 + difficulty) % 5) - 2) * (1.5 + difficulty * 0.3),
+  const targetX =
+      (((index * 3 + difficulty) % 5) - 2) * (1.5 + difficulty * 0.3),
     targetZ = goalSign * (P.arena.halfLength + 3) - ballZ,
     aimLength = Math.hypot(targetX - ballX, targetZ) || 1,
     dirX = (targetX - ballX) / aimLength,
     dirZ = targetZ / aimLength,
     sideX = -dirZ,
     sideZ = dirX,
-    startDistance = 7.5 + difficulty * 0.55 + (kind === 6 || kind === 7 ? 1.5 : 0),
-    sideOffset = ((index + difficulty) % 3 - 1) * (0.7 + difficulty * 0.12),
+    startDistance =
+      7.5 + difficulty * 0.55 + (kind === 6 || kind === 7 ? 1.5 : 0),
+    sideOffset = (((index + difficulty) % 3) - 1) * (0.7 + difficulty * 0.12),
     carX = Math.max(
       -P.arena.halfWidth + 5,
       Math.min(
@@ -144,10 +160,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
         ballZ - dirZ * startDistance + sideZ * sideOffset,
       ),
     ),
-    timer = Math.max(
-      6,
-      Math.round((timerBases[index] - difficulty * 0.95) * 10) / 10,
-    );
+    timer = Math.round((timerBases[index] - difficulty * 0.48) * 10) / 10;
 
   return {
     carX,
@@ -198,8 +211,12 @@ export function readTrainingPackRecords(): TrainingPackRecords {
       const best = Number(value.best),
         last = Number(value.last);
       if (
-        Number.isInteger(best) && best >= 0 && best <= 11 &&
-        Number.isInteger(last) && last >= 0 && last <= 11
+        Number.isInteger(best) &&
+        best >= 0 &&
+        best <= 11 &&
+        Number.isInteger(last) &&
+        last >= 0 &&
+        last <= 11
       )
         records[pack.id] = { best, last };
     }
@@ -235,7 +252,9 @@ export class TrainingPackRun {
   message = "";
 
   get pack() {
-    return TRAINING_PACKS.find((candidate) => candidate.id === this.packId) ?? null;
+    return (
+      TRAINING_PACKS.find((candidate) => candidate.id === this.packId) ?? null
+    );
   }
 
   start(packId: string, match: Match, simulation: Simulation) {
@@ -274,12 +293,13 @@ export class TrainingPackRun {
     }
 
     if (match.phase === "goal") {
-      const scored = match.goalFocus
-        ? scoringTeam(match.goalFocus) === this.currentShot.goalTeam
-        : false;
+      const scored =
+        !!match.goalFocus &&
+        scoringTeam(match.goalFocus) === this.currentShot.goalTeam &&
+        simulation.lastTouchId === simulation.cars[0].id;
       if (scored) this.score++;
       this.message = scored ? "GOAL · POINT" : "WRONG GOAL · NO POINT";
-      return this.advance(match, simulation);
+      return this.advance(match);
     }
 
     if (match.phase === "playing") {
@@ -288,14 +308,17 @@ export class TrainingPackRun {
         this.message = "TIME EXPIRED · NO POINT";
         simulation.ballCollider.setCollisionGroups(0);
         simulation.ball.setEnabled(false);
-        return this.advance(match, simulation);
+        return this.advance(match);
       }
     }
     return null;
   }
 
   get currentShot() {
-    return this.pack?.shots[Math.min(this.shotIndex, 10)] ?? TRAINING_PACKS[0].shots[0];
+    return (
+      this.pack?.shots[Math.min(this.shotIndex, 10)] ??
+      TRAINING_PACKS[0].shots[0]
+    );
   }
 
   get view() {
@@ -310,6 +333,7 @@ export class TrainingPackRun {
       shot: this.shotIndex,
       total: 11,
       score: this.score,
+      goalTeam: shot.goalTeam,
       timer: this.timeLeft,
       timerLimit: this.timerLimit,
       cannon: shot.cannon,
@@ -323,7 +347,7 @@ export class TrainingPackRun {
     return this.pack!.shots[this.shotIndex];
   }
 
-  private advance(match: Match, simulation: Simulation): TrainingPackTick {
+  private advance(match: Match): TrainingPackTick {
     this.shotIndex++;
     if (this.shotIndex >= 11) {
       this.finish(match);

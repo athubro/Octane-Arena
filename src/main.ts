@@ -47,6 +47,7 @@ import { DemolitionFlash } from "./effects/demolition-flash";
 import { RingChallenge } from "./game/ring-challenge";
 import { RingCourseView } from "./render/ring-course";
 import { RingMap } from "./render/ring-map";
+import { TrainingPackRun } from "./game/training-packs";
 import type {
   ArenaField,
   MatchSnapshot,
@@ -73,9 +74,11 @@ async function boot() {
     match = new Match(),
     goalReplay = new GoalReplay(),
     ringChallenge = new RingChallenge(),
+    trainingPackRun = new TrainingPackRun(),
     pads = new Pads(),
     audio = new GameAudio();
   ui.setProfile(garage.profile);
+  ui.renderTrainingPacks(trainingPackRun.records);
   document.querySelector("#rings-mode small")!.textContent =
     `BEAT YOUR BEST · ${ringChallenge.best} RINGS`;
   const renderer = new T.WebGLRenderer({
@@ -109,7 +112,8 @@ async function boot() {
   scene.add(sun);
   const arena = drawArena(scene, settings.value.quality);
   let selectedField: ArenaField = "lumen",
-    pendingMode: "bot" | "freeplay" | "rings" = "bot";
+    pendingMode: "bot" | "freeplay" | "rings" = "bot",
+    pendingTrainingPackId: string | null = null;
   const grassVelocities = simulation.cars.map(() => new T.Vector3());
   const ringCourse = new RingCourseView(scene, ringChallenge);
   const ringMap = new RingMap(scene);
@@ -278,7 +282,8 @@ async function boot() {
     stay;
   const loop = new FixedLoop();
   const rankedBot = new RankedBotRating();
-  let rankedQueue = false, rankedSettled = false;
+  let rankedQueue = false,
+    rankedSettled = false;
   const start = (
     mode: "bot" | "freeplay" | "rings" = match.mode === "freeplay"
       ? "freeplay"
@@ -286,6 +291,7 @@ async function boot() {
         ? "rings"
         : "bot",
   ) => {
+    trainingPackRun.stop();
     goalReplay.reset();
     goalReplayPending = false;
     ui.modes(false);
@@ -316,7 +322,8 @@ async function boot() {
     simulation.cars.forEach((car) => car.setProRankedCpu(false));
     document.getElementById("bot-tag")!.textContent = opponent.name;
     activePartyGameId = null;
-    const proRankedCpu = mode === "bot" && rankedQueue && rankedBot.level === 10;
+    const proRankedCpu =
+      mode === "bot" && rankedQueue && rankedBot.level === 10;
     match.rankedCpuCannotLose = proRankedCpu;
     match.start(simulation, mode);
     if (proRankedCpu) simulation.cars[1]?.setProRankedCpu(true);
@@ -330,6 +337,12 @@ async function boot() {
     loop.accumulator = 0;
     cameraControl.reset();
     cameraControl.ballMode = mode !== "rings";
+    ui.trainingPackResult = false;
+    ui.trainingPackName = "";
+    if (mode === "freeplay" && pendingTrainingPackId) {
+      trainingPackRun.start(pendingTrainingPackId, match, simulation);
+      pendingTrainingPackId = null;
+    }
     audio.tone(420, 0.12, 0.08, "sine");
   };
   const startParty = (game: PartyGame) => {
@@ -338,6 +351,9 @@ async function boot() {
       party.message = "YOU ARE NOT A PARTICIPANT IN THIS MATCH";
       return;
     }
+    trainingPackRun.stop();
+    ui.trainingPackResult = false;
+    ui.trainingPackName = "";
     goalReplay.reset();
     goalReplayPending = false;
     const members = [
@@ -402,6 +418,7 @@ async function boot() {
     )
       void party.action("endMatch");
     if (activePartyGameId) dismissedPartyGameId = activePartyGameId;
+    trainingPackRun.stop();
     goalReplay.reset();
     goalReplayPending = false;
     activePartyGameId = null;
@@ -428,7 +445,9 @@ async function boot() {
   const chooseMode = (mode: "bot" | "freeplay" | "rings") => {
     pendingMode = mode;
     rankedQueue = false;
-    document.getElementById("cpu-level-control")!.toggleAttribute("hidden", true);
+    document
+      .getElementById("cpu-level-control")!
+      .toggleAttribute("hidden", true);
     ui.fields(true);
     document
       .querySelectorAll<HTMLButtonElement>("[data-field]")
@@ -446,29 +465,51 @@ async function boot() {
     document.getElementById("cpu-level-control")!.removeAttribute("hidden");
     const select = document.getElementById("cpu-level") as HTMLSelectElement;
     select.value = String(rankedBot.level);
-    document.getElementById("cpu-elo-label")!.textContent = `CPU ELO ${rankedBot.elo}`;
+    document.getElementById("cpu-elo-label")!.textContent =
+      `CPU ELO ${rankedBot.elo}`;
   });
   ui.on("freeplay-mode", () => chooseMode("freeplay"));
-  ui.on("rings-mode", () => chooseMode("rings"));
-  document.querySelectorAll<HTMLButtonElement>("[data-field]").forEach((button) => {
-    button.onclick = () => {
-      selectedField = button.dataset.field as ArenaField;
-      document
-        .querySelectorAll<HTMLButtonElement>("[data-field]")
-        .forEach((candidate) =>
-          candidate.setAttribute(
-            "aria-pressed",
-            String(candidate.dataset.field === selectedField),
-          ),
-        );
-    };
+  ui.on("training-packs-mode", () => {
+    rankedQueue = false;
+    ui.renderTrainingPacks(trainingPackRun.records);
+    ui.packs(true);
   });
+  ui.on("packs-back", () => ui.packs(false));
+  document
+    .getElementById("training-pack-list")!
+    .addEventListener("click", (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+        "[data-training-pack]",
+      );
+      if (!button?.dataset.trainingPack) return;
+      pendingTrainingPackId = button.dataset.trainingPack;
+      start("freeplay");
+    });
+  ui.on("rings-mode", () => chooseMode("rings"));
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-field]")
+    .forEach((button) => {
+      button.onclick = () => {
+        selectedField = button.dataset.field as ArenaField;
+        document
+          .querySelectorAll<HTMLButtonElement>("[data-field]")
+          .forEach((candidate) =>
+            candidate.setAttribute(
+              "aria-pressed",
+              String(candidate.dataset.field === selectedField),
+            ),
+          );
+      };
+    });
   ui.on("fields-back", () => ui.fields(false));
   ui.on("field-start", () => start(pendingMode));
   document.getElementById("cpu-level")!.addEventListener("change", (event) => {
-    rankedBot.setLevel(Number((event.currentTarget as HTMLSelectElement).value));
+    rankedBot.setLevel(
+      Number((event.currentTarget as HTMLSelectElement).value),
+    );
     opponent.level = rankedBot.level;
-    document.getElementById("cpu-elo-label")!.textContent = `CPU ELO ${rankedBot.elo}`;
+    document.getElementById("cpu-elo-label")!.textContent =
+      `CPU ELO ${rankedBot.elo}`;
   });
   ui.on("garage-open", () => {
     ui.screen = "garage";
@@ -480,6 +521,11 @@ async function boot() {
   ui.on("modes-back", () => ui.modes(false));
   ui.on("again", () => {
     if (match.mode !== "party") {
+      if (trainingPackRun.completed && trainingPackRun.packId) {
+        pendingTrainingPackId = trainingPackRun.packId;
+        start("freeplay");
+        return;
+      }
       start();
       return;
     }
@@ -512,6 +558,11 @@ async function boot() {
   ui.on("pause-reset", () => {
     if (match.mode === "rings") {
       start("rings");
+    } else if (trainingPackRun.active) {
+      trainingPackRun.restart(match, simulation);
+      resetEffects();
+      pads.reset();
+      cameraControl.reset();
     } else if (match.rules.training) {
       match.kickoff(simulation);
       resetEffects();
@@ -712,18 +763,19 @@ async function boot() {
       } else match.pause();
     }
     input.takeAction("reset"); // Legacy binding never resets a competitive match.
-    for (const action of trainingActions)
-      if (input.takeAction(action)) {
-        if (
-          trainingAction(action, match, simulation) &&
-          action === "trainingReset"
-        ) {
-          resetEffects();
-          pads.reset();
-          cameraControl.reset();
-          loop.accumulator = 0;
+    if (!trainingPackRun.active)
+      for (const action of trainingActions)
+        if (input.takeAction(action)) {
+          if (
+            trainingAction(action, match, simulation) &&
+            action === "trainingReset"
+          ) {
+            resetEffects();
+            pads.reset();
+            cameraControl.reset();
+            loop.accumulator = 0;
+          }
         }
-      }
     const remoteParty =
       match.mode === "party" &&
       activePartyGameId !== null &&
@@ -833,7 +885,8 @@ async function boot() {
         if (phase === "goal") {
           if (match.mode === "party") {
             simulation.step(partyInputs());
-          } else simulation.step([controls, neutral()]);
+          } else if (!trainingPackRun.active)
+            simulation.step([controls, neutral()]);
           if (
             match.rules.infiniteBoost &&
             (match.mode === "rings" || settings.value.infiniteBoost)
@@ -842,8 +895,20 @@ async function boot() {
         }
         const wasFinished = match.phase === "finished";
         match.tick(simulation);
+        const packTick = trainingPackRun.tick(match, simulation, P.dt);
+        if (packTick === "shot") {
+          resetEffects();
+          pads.reset();
+          cameraControl.reset();
+        } else if (packTick === "complete") {
+          resetEffects();
+          cameraControl.reset();
+          ui.renderTrainingPacks(trainingPackRun.records);
+        }
         if (
-          !wasFinished && match.phase === "finished" && rankedQueue &&
+          !wasFinished &&
+          match.phase === "finished" &&
+          rankedQueue &&
           !rankedSettled
         ) {
           rankedSettled = true;
@@ -867,7 +932,11 @@ async function boot() {
           Math.ceil(match.countdown) !== countdownNumber
         )
           audio.tone(match.phase === "playing" ? 760 : 420, 0.12, 0.08, "sine");
-        if (phase === "playing" && match.phase === "goal") {
+        if (
+          phase === "playing" &&
+          match.phase === "goal" &&
+          !trainingPackRun.active
+        ) {
           goalReplayPending = true;
           audio.tone(100, 1.3, 0.2, "sawtooth");
           audio.tone(660, 0.9, 0.1, "triangle");
@@ -1049,9 +1118,7 @@ async function boot() {
     if (replayFrame) {
       const focus = replayFrame.ball.position,
         goalSide = Math.sign(match.goalFocus?.z ?? focus.z) || 1,
-        cameraPosition = focus
-          .clone()
-          .add(new T.Vector3(9, 7, -goalSide * 14));
+        cameraPosition = focus.clone().add(new T.Vector3(9, 7, -goalSide * 14));
       camera.position.lerp(cameraPosition, 1 - Math.exp(-dt * 7));
       camera.up.set(0, 1, 0);
       camera.lookAt(focus.x, focus.y + 0.5, focus.z);
@@ -1135,6 +1202,7 @@ async function boot() {
       statsTime = 0;
     }
     debug.update(simulation, fps, ticksPerSecond);
+    ui.updateTrainingPack(trainingPackRun.view);
     ui.update(
       match,
       simulation.cars[0].boost,

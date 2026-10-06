@@ -1632,6 +1632,15 @@ output {
     flex: 1;
     padding: 9px 10px;
   }
+  .training-pack-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(132px, auto);
+    gap: 8px;
+  }
+  .training-pack-card {
+    min-height: 132px;
+    padding: 12px;
+  }
 }
 #training-pack-hud {
   position: absolute;
@@ -1659,6 +1668,7 @@ output {
 #training-pack-cannon { color: #ffd387; font-size: 11px; letter-spacing: .12em; }
 .training-pack-hud-row { margin-top: 3px; }
 #training-pack-shot { color: #bcecf2; font-size: 13px; letter-spacing: .1em; }
+#training-pack-target { color: #fff0bd; font-size: 11px; letter-spacing: .08em; }
 #training-pack-time { color: #fff0bd; font-size: 18px; font-variant-numeric: tabular-nums; }
 #training-pack-points { color: #9ddce6; font-size: 12px; letter-spacing: .1em; }
 .training-pack-timer { height: 5px; margin-top: 7px; overflow: hidden; background: #263f50; }
