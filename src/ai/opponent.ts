@@ -3,6 +3,20 @@ import type { Car } from "../car/car";
 import { neutral, type Controls } from "../input/types";
 import { P } from "../config/physics";
 
+interface InterceptPlan {
+  ballX: number;
+  ballY: number;
+  ballZ: number;
+  contactX: number;
+  contactZ: number;
+  attackX: number;
+  attackZ: number;
+  time: number;
+  airborne: boolean;
+  ownGoalDanger: boolean;
+  feasible: boolean;
+}
+
 /** Ranked rival with progressively faster reads, cleaner hits, and aerial play. */
 export class Opponent {
   name = "";
@@ -18,6 +32,16 @@ export class Opponent {
   private localOpponent = new Vector3();
   private aerialPoint = new Vector3();
   private aerialLocal = new Vector3();
+  private readonly predictionStep = P.dt * 2;
+  private readonly predictionHorizon = 180;
+  private readonly predictedX = new Float32Array(this.predictionHorizon + 1);
+  private readonly predictedY = new Float32Array(this.predictionHorizon + 1);
+  private readonly predictedZ = new Float32Array(this.predictionHorizon + 1);
+  private readonly predictedVX = new Float32Array(this.predictionHorizon + 1);
+  private readonly predictedVY = new Float32Array(this.predictionHorizon + 1);
+  private readonly predictedVZ = new Float32Array(this.predictionHorizon + 1);
+  private predictedCount = 0;
+  private predictedGoalTeam: number | null = null;
   private nextJump = 0;
   private directCommitUntil = 0;
   private aerialLaunchedAt = -Infinity;
@@ -65,9 +89,11 @@ export class Opponent {
     const skill = Math.max(0, Math.min(1, (this.level - 1) / 9));
     let shotTargetX = 0;
     if (skill > 0.65) {
-      const opponentGoalZ = car.team === 0 ? -P.arena.halfLength : P.arena.halfLength;
+      const opponentGoalZ =
+        car.team === 0 ? -P.arena.halfLength : P.arena.halfLength;
       for (const other of opponents) {
-        if (!other.active || !other.body.isEnabled() || other.team === car.team) continue;
+        if (!other.active || !other.body.isEnabled() || other.team === car.team)
+          continue;
         const defender = other.body.translation();
         if (
           Math.abs(defender.z - opponentGoalZ) < 18 &&
@@ -80,104 +106,79 @@ export class Opponent {
       }
     }
 
-    // Aim at where the ball will be when the car arrives instead of steering
-    // after its current position. Bound the estimate because wall bounces can
-    // invalidate long linear predictions.
     const currentBallDistance = Math.hypot(ball.x - p.x, ball.z - p.z),
       carVelocity = car.body.linvel(),
       carSpeed = Math.hypot(carVelocity.x, carVelocity.y, carVelocity.z),
-      arrivalSpeed = Math.max(8, Math.min(25, carSpeed * 0.62 + 8)),
-      arrivalTime = Math.max(
-        0.04,
-        Math.min(0.72, (currentBallDistance - 1.4) / arrivalSpeed),
+      ownGoalSign = car.team === 0 ? 1 : -1,
+      aerialSkill = Math.max(0, Math.min(1, (this.level - 5) / 5)),
+      plan = this.planIntercept(
+        car,
+        ball,
+        ballVelocity,
+        shotTargetX,
+        ownGoalSign,
+        skill,
+        aerialSkill,
       ),
-      lead = skill > 0.45
-        ? arrivalTime
-        : 0.025 + skill * Math.min(0.18, currentBallDistance / 110);
-    this.predictedBall.set(
-      ball.x + ballVelocity.x * lead,
-      Math.max(
-        P.ball.radius,
-        ball.y + ballVelocity.y * lead - 0.5 * P.gravity * lead * lead,
-      ),
-      ball.z + ballVelocity.z * lead,
-    );
-    // Team 0 defends +Z; team 1 defends -Z. When the ball is in the bot's
-    // defensive third or moving toward its goal, clear it toward the far wing.
-    const ownGoalSign = car.team === 0 ? 1 : -1;
-    const ownGoalDanger =
-      ownGoalSign * ball.z > P.arena.halfLength - 18 ||
-      (ownGoalSign * ballVelocity.z > 9 &&
-        ownGoalSign * ball.z > P.arena.halfLength - 30);
-    if (ownGoalDanger)
-      shotTargetX =
-        ball.x >= 0
-          ? -P.arena.goalHalf * 1.7
-          : P.arena.goalHalf * 1.7;
-    const attackingGoalZ = -ownGoalSign * (P.arena.halfLength + 5);
-    this.attack
-      .set(
-        shotTargetX - this.predictedBall.x,
-        0,
-        attackingGoalZ - this.predictedBall.z,
-      )
-      .normalize();
+      interceptTime = plan.time,
+      hasAerialIntercept = aerialSkill > 0 && plan.airborne && plan.feasible,
+      ownGoalDanger = plan.ownGoalDanger;
+    this.predictedBall.set(plan.ballX, plan.ballY, plan.ballZ);
+    this.attack.set(plan.attackX, 0, plan.attackZ).normalize();
+    this.target.set(plan.contactX, 0, plan.contactZ);
+    if (hasAerialIntercept)
+      this.aerialPoint.set(plan.contactX, plan.ballY - 0.15, plan.contactZ);
 
-    // Offset the aim point away from the opponent's goal so a hit sends the
-    // ball forward. Lower levels accept a wider, less deliberate approach.
-    const offset = 2.15 + (1 - skill) * 1.25;
-    this.target
-      .set(this.predictedBall.x, 0, this.predictedBall.z)
-      .addScaledVector(this.attack, -offset);
+    // Ranks below pro retain small aiming error. The pro uses the selected
+    // collision-safe shot line without wandering its contact point.
     const error = (1 - skill) * 1.05;
     this.target.x += Math.sin(time * (1.3 + skill) + car.team * 3) * error;
     this.target.z += Math.sin(time * 0.83 + car.team) * error * 0.7;
 
-    // Skilled ranks project the ball's flight and drive to a shot line where
-    // the car can meet it. The reachable window grows with rank and boost.
-    const aerialSkill = Math.max(0, Math.min(1, (this.level - 5) / 5));
-    let interceptTime = 0,
-      interceptScore = Infinity;
-    if (aerialSkill > 0 && ball.y > 2.25) {
-      const velocity = car.body.linvel(),
-        speed = Math.hypot(velocity.x, velocity.y, velocity.z),
-        reachBonus = 2.4 + aerialSkill * 2.8 + Math.min(car.boost, 60) * 0.035;
-      for (let flight = 0.32; flight <= 1.55; flight += 0.06) {
-        const bx = ball.x + ballVelocity.x * flight,
-          by = ball.y + ballVelocity.y * flight - 0.5 * P.gravity * flight * flight,
-          bz = ball.z + ballVelocity.z * flight;
-        if (by < 2.15 || by > P.arena.goalHeight + 8) continue;
-        const aimX = shotTargetX - bx,
-          aimZ = car.team === 0
-            ? -(P.arena.halfLength + 5 - bz)
-            : P.arena.halfLength + 5 - bz,
-          aimLength = Math.hypot(aimX, aimZ) || 1,
-          contactX = bx - (aimX / aimLength) * (1.25 + (1 - aerialSkill) * 0.3),
-          contactZ = bz - (aimZ / aimLength) * (1.25 + (1 - aerialSkill) * 0.3),
-          distance = Math.hypot(contactX - p.x, by - p.y, contactZ - p.z),
-          reachable = (speed + 5 + aerialSkill * 5) * flight +
-            0.5 * (3 + aerialSkill * 9) * flight * flight + reachBonus;
-        if (distance > reachable * (0.82 + aerialSkill * 0.13)) continue;
-        const score = flight * 0.78 + distance / Math.max(1, reachable) + Math.abs(by - 3) * 0.012;
-        if (score >= interceptScore) continue;
-        interceptScore = score;
-        interceptTime = flight;
-        this.aerialPoint.set(contactX, by - 0.15, contactZ);
-      }
-    }
-    const hasAerialIntercept = Number.isFinite(interceptScore);
-    if (hasAerialIntercept) this.target.set(this.aerialPoint.x, 0, this.aerialPoint.z);
-    const closeShot = skill > 0.78 && currentBallDistance < 4.6 + skill * 3.2 &&
-      (!hasAerialIntercept || ball.y < 4.4 || currentBallDistance < 3.4);
+    // A close commit is valid only from behind the ball on the chosen shot
+    // line. If the bot is on the wrong side it must circle to the safe line,
+    // rather than ploughing through the ball toward its own net.
+    const ballFromCarX = this.predictedBall.x - p.x,
+      ballFromCarZ = this.predictedBall.z - p.z,
+      safeSide =
+        ballFromCarX * this.attack.x + ballFromCarZ * this.attack.z > 0.45,
+      forwardAlignment =
+        car.forward.x * this.attack.x + car.forward.z * this.attack.z,
+      closeShot =
+        skill > 0.78 &&
+        currentBallDistance < 4.6 + skill * 3.2 &&
+        safeSide &&
+        forwardAlignment > 0.15 &&
+        (!hasAerialIntercept || plan.ballY < 4.4 || currentBallDistance < 3.4);
     if (closeShot) this.directCommitUntil = time + 0.3;
-    const directCommit = closeShot || (skill > 0.78 && time < this.directCommitUntil);
+    const directCommit =
+      closeShot ||
+      (skill > 0.78 &&
+        time < this.directCommitUntil &&
+        safeSide &&
+        forwardAlignment > 0.15);
+    if (!safeSide && currentBallDistance < 10) {
+      // Go around the ball before lining up behind it. Driving straight to
+      // the contact point from the goal side would hit it toward our own net.
+      const sideX = -this.attack.z,
+        sideZ = this.attack.x,
+        side =
+          (p.x - this.predictedBall.x) * sideX +
+            (p.z - this.predictedBall.z) * sideZ >=
+          0
+            ? 1
+            : -1;
+      this.target.set(
+        this.predictedBall.x - this.attack.x * 1.8 + sideX * side * 3.4,
+        0,
+        this.predictedBall.z - this.attack.z * 1.8 + sideZ * side * 3.4,
+      );
+    }
     if (directCommit) {
       this.target.set(
-        ball.x + ballVelocity.x * 0.035 - this.attack.x * 1.35,
+        this.predictedBall.x - this.attack.x * 1.35,
         0,
-        ball.z +
-          ballVelocity.z * 0.035 -
-          this.attack.z * (ownGoalDanger ? 1.9 : 1.35),
+        this.predictedBall.z - this.attack.z * (ownGoalDanger ? 1.9 : 1.35),
       );
     }
 
@@ -253,16 +254,17 @@ export class Opponent {
     // Choose speed from braking distance. The old fixed speed gate only
     // coasted when fast, so a pro bot kept sliding past its approach point.
     const maxApproachSpeed =
-      skill >= 0.99
-        ? Math.min(car.maxLinearSpeed * 0.88, P.car.maxSpeed * 1.08)
-        : 8 + skill * 14,
+        skill >= 0.99
+          ? Math.min(car.maxLinearSpeed * 0.88, P.car.maxSpeed * 1.08)
+          : 8 + skill * 14,
       distanceToContact = Math.max(0, distance - 1.5),
       contactSpeed = 6 + skill * 4,
       turnFactor = Math.max(0.35, 1 - Math.max(0, absAngle - 0.35) * 0.4),
-      desiredSpeed = Math.min(
-        maxApproachSpeed,
-        Math.sqrt(contactSpeed * contactSpeed + 36 * distanceToContact),
-      ) * turnFactor;
+      desiredSpeed =
+        Math.min(
+          maxApproachSpeed,
+          Math.sqrt(contactSpeed * contactSpeed + 36 * distanceToContact),
+        ) * turnFactor;
     if (reverse) c.throttle = -0.65;
     else if (car.forwardSpeed > desiredSpeed + 0.7) c.throttle = -1;
     else if (car.forwardSpeed < desiredSpeed - 0.7) c.throttle = 1;
@@ -292,17 +294,26 @@ export class Opponent {
       jumpRange = 2.3 + skill * 1.2,
       aerialActive = time - this.aerialLaunchedAt < 1.6;
     if (car.grounded && time > this.nextJump) {
-      const launchDistance = Math.hypot(this.aerialPoint.x - p.x, this.aerialPoint.z - p.z),
-        launchAerial = aerialSkill > 0 && hasAerialIntercept &&
-          launchDistance < 3.8 + aerialSkill * 4.4 && interceptTime > 0.25;
+      const launchDistance = Math.hypot(
+          this.aerialPoint.x - p.x,
+          this.aerialPoint.z - p.z,
+        ),
+        launchAerial =
+          aerialSkill > 0 &&
+          hasAerialIntercept &&
+          launchDistance < 3.8 + aerialSkill * 4.4 &&
+          interceptTime > 0.25;
       if (launchAerial) {
         c.jump = true;
         this.aerialLaunchedAt = time;
         this.aerialDoubleUsed = false;
         this.nextJump = time + 1.65 - aerialSkill * 0.35;
       } else if (
-        !hasAerialIntercept && ball.y > 1.45 && ball.y < jumpHeight &&
-        ballDistance < jumpRange && aerialSkill < 0.6
+        !hasAerialIntercept &&
+        ball.y > 1.45 &&
+        ball.y < jumpHeight &&
+        ballDistance < jumpRange &&
+        aerialSkill < 0.6
       ) {
         c.jump = true;
         this.nextJump = time + 1.25 - skill * 0.3;
@@ -316,13 +327,17 @@ export class Opponent {
         c.jump = true;
         this.aerialDoubleUsed = true;
       }
-      this.aerialLocal.copy(this.aerialPoint).sub(p).applyQuaternion(
-        this.inverse.copy(car.body.rotation()).invert(),
-      );
+      this.aerialLocal
+        .copy(this.aerialPoint)
+        .sub(p)
+        .applyQuaternion(this.inverse.copy(car.body.rotation()).invert());
       const horizontal = Math.hypot(this.aerialLocal.x, this.aerialLocal.z),
         yawError = Math.atan2(this.aerialLocal.x, -this.aerialLocal.z),
         pitchError = Math.atan2(this.aerialLocal.y, Math.max(0.2, horizontal));
-      c.pitch = Math.max(-1, Math.min(1, -pitchError * (1.1 + aerialSkill * 0.55)));
+      c.pitch = Math.max(
+        -1,
+        Math.min(1, -pitchError * (1.1 + aerialSkill * 0.55)),
+      );
       c.yaw = Math.max(-1, Math.min(1, yawError * (1.05 + aerialSkill * 0.45)));
       c.roll = Math.max(-0.55, Math.min(0.55, car.right.y * 0.55));
       const distanceToIntercept = this.aerialLocal.length(),
@@ -331,7 +346,8 @@ export class Opponent {
           Math.sqrt(64 + 30 * Math.max(0, distanceToIntercept - 1.5)),
         );
       c.throttle = distanceToIntercept > 2.5 ? 1 : 0;
-      c.boost = car.boost > 0 &&
+      c.boost =
+        car.boost > 0 &&
         distanceToIntercept > 5 &&
         carSpeed < aerialSpeedLimit &&
         Math.abs(yawError) < 0.72 &&
@@ -342,5 +358,297 @@ export class Opponent {
       c.roll = car.right.y * 0.65;
     }
     return c;
+  }
+
+  /** Predict the ball with fixed substeps, gravity, damping, and stadium rebounds. */
+  private predictBallTrajectory(
+    ball: { x: number; y: number; z: number },
+    velocity: { x: number; y: number; z: number },
+  ) {
+    const a = P.arena,
+      r = P.ball.radius,
+      dt = this.predictionStep,
+      drag = 1 / (1 + P.ball.drag * dt);
+    let x = ball.x,
+      y = ball.y,
+      z = ball.z,
+      vx = velocity.x,
+      vy = velocity.y,
+      vz = velocity.z;
+    this.predictedGoalTeam = null;
+    this.predictedCount = 1;
+    this.predictedX[0] = x;
+    this.predictedY[0] = y;
+    this.predictedZ[0] = z;
+    this.predictedVX[0] = vx;
+    this.predictedVY[0] = vy;
+    this.predictedVZ[0] = vz;
+
+    for (let i = 1; i <= this.predictionHorizon; i++) {
+      vy -= P.gravity * dt;
+      x += vx * dt;
+      y += vy * dt;
+      z += vz * dt;
+      vx *= drag;
+      vy *= drag;
+      vz *= drag;
+
+      if (y < r) {
+        y = r;
+        if (vy < 0) vy = Math.abs(vy) < 1 ? 0 : -vy * P.ball.restitution;
+        vx *= 0.985;
+        vz *= 0.985;
+      } else if (y > a.height - r) {
+        y = a.height - r;
+        if (vy > 0) vy = -vy * 0.58;
+      }
+
+      const inGoalMouth =
+        Math.abs(x) < a.goalHalf - r && y >= 0 && y < a.goalHeight - r;
+      let inGoalTunnel = false;
+      if (Math.abs(z) > a.halfLength - r) {
+        if (inGoalMouth) {
+          inGoalTunnel = true;
+          if (Math.abs(x) > a.goalHalf - r) {
+            x = Math.sign(x) * (a.goalHalf - r);
+            vx = -Math.sign(x) * Math.abs(vx) * 0.65;
+          }
+          if (y > a.goalHeight - r) {
+            y = a.goalHeight - r;
+            vy = -Math.abs(vy) * 0.58;
+          }
+          if (Math.abs(z) > a.halfLength + a.goalDepth - r) {
+            z = Math.sign(z) * (a.halfLength + a.goalDepth - r);
+            vz = -Math.sign(z) * Math.abs(vz) * 0.65;
+          }
+          if (
+            Math.abs(z) > a.halfLength + r &&
+            Math.abs(x) < a.goalHalf - r &&
+            y >= 0 &&
+            y < a.goalHeight - r
+          ) {
+            this.predictedGoalTeam = z < 0 ? 0 : 1;
+          }
+        } else if (Math.abs(x) <= a.halfWidth - a.corner) {
+          z = Math.sign(z) * (a.halfLength - r);
+          if (vz * Math.sign(z) > 0) vz = -vz * 0.68;
+        }
+      }
+
+      if (!inGoalTunnel) {
+        // The field shell rounds both corners and curves inward at floor and
+        // ceiling. Approximate that cross-section before resolving its normal.
+        const lowerY = Math.max(0, Math.min(a.ramp, y)),
+          lowerInset =
+            y < a.ramp
+              ? a.ramp *
+                (1 - Math.sqrt(Math.max(0, 1 - (1 - lowerY / a.ramp) ** 2)))
+              : 0,
+          upperY = Math.max(0, Math.min(a.ramp, y - (a.height - a.ramp))),
+          upperInset =
+            y > a.height - a.ramp
+              ? a.ramp *
+                (1 - Math.sqrt(Math.max(0, 1 - (upperY / a.ramp) ** 2)))
+              : 0,
+          inset = Math.max(lowerInset, upperInset),
+          width = a.halfWidth - r - inset,
+          length = a.halfLength - r - inset,
+          corner = Math.max(0.1, a.corner - r),
+          cornerX = width - corner,
+          cornerZ = length - corner,
+          ax = Math.abs(x),
+          az = Math.abs(z);
+        let nx = 0,
+          nz = 0,
+          correction = 0;
+        if (ax > cornerX && az > cornerZ) {
+          const dx = ax - cornerX,
+            dz = az - cornerZ,
+            distance = Math.hypot(dx, dz);
+          if (distance > corner) {
+            nx = (Math.sign(x) * dx) / (distance || 1);
+            nz = (Math.sign(z) * dz) / (distance || 1);
+            correction = distance - corner;
+          }
+        } else if (ax > width) {
+          nx = Math.sign(x);
+          correction = ax - width;
+        } else if (az > length) {
+          nz = Math.sign(z);
+          correction = az - length;
+        }
+        if (correction > 0) {
+          x -= nx * correction;
+          z -= nz * correction;
+          const outwardSpeed = vx * nx + vz * nz;
+          if (outwardSpeed > 0) {
+            vx -= nx * outwardSpeed * 1.68;
+            vz -= nz * outwardSpeed * 1.68;
+            vx *= 0.985;
+            vz *= 0.985;
+          }
+        }
+      }
+
+      this.predictedX[i] = x;
+      this.predictedY[i] = y;
+      this.predictedZ[i] = z;
+      this.predictedVX[i] = vx;
+      this.predictedVY[i] = vy;
+      this.predictedVZ[i] = vz;
+      this.predictedCount = i + 1;
+      if (this.predictedGoalTeam !== null) break;
+    }
+  }
+
+  /** Choose the earliest collision point the car can reach on a safe shot line. */
+  private planIntercept(
+    car: Car,
+    ball: { x: number; y: number; z: number },
+    ballVelocity: { x: number; y: number; z: number },
+    shotTargetX: number,
+    ownGoalSign: number,
+    skill: number,
+    aerialSkill: number,
+  ): InterceptPlan {
+    this.predictBallTrajectory(ball, ballVelocity);
+    const p = car.body.translation(),
+      velocity = car.body.linvel(),
+      carSpeed = Math.hypot(velocity.x, velocity.z),
+      attackingGoalZ = -ownGoalSign * (P.arena.halfLength + 5),
+      maxIndex =
+        this.predictedGoalTeam === null
+          ? this.predictedCount
+          : Math.max(1, this.predictedCount - 1);
+    let best: InterceptPlan | null = null,
+      bestScore = Infinity,
+      fallback: InterceptPlan | null = null,
+      fallbackScore = Infinity;
+
+    for (let i = 1; i < maxIndex; i++) {
+      const bx = this.predictedX[i],
+        by = this.predictedY[i],
+        bz = this.predictedZ[i],
+        t = i * this.predictionStep;
+      if (by < P.ball.radius || by > P.arena.height - P.ball.radius) continue;
+      const ownGoalDanger =
+          ownGoalSign * bz > P.arena.halfLength - 18 ||
+          (ownGoalSign * this.predictedVZ[i] > 3 &&
+            ownGoalSign * bz > P.arena.halfLength - 32),
+        airborne = by > 2.05;
+      if (airborne && aerialSkill < 0.12) continue;
+      if (airborne && by > P.arena.goalHeight + 0.5) continue;
+
+      const targetX = ownGoalDanger
+          ? bx >= 0
+            ? -P.arena.goalHalf * 1.7
+            : P.arena.goalHalf * 1.7
+          : shotTargetX,
+        aimX = targetX - bx,
+        aimZ = attackingGoalZ - bz,
+        aimLength = Math.hypot(aimX, aimZ) || 1,
+        attackX = aimX / aimLength,
+        attackZ = aimZ / aimLength,
+        offset = 1.55 + (1 - skill) * 0.6,
+        contactX = bx - attackX * offset,
+        contactZ = bz - attackZ * offset,
+        routeX = contactX - p.x,
+        routeZ = contactZ - p.z,
+        distance = Math.hypot(routeX, routeZ),
+        dirX = routeX / (distance || 1),
+        dirZ = routeZ / (distance || 1),
+        facingDot = Math.max(
+          -1,
+          Math.min(1, car.forward.x * dirX + car.forward.z * dirZ),
+        ),
+        turnAngle = Math.acos(facingDot),
+        turnTime = Math.min(
+          1.55,
+          (turnAngle / (1.25 + carSpeed * 0.055)) * (1 - skill * 0.2),
+        ),
+        driveTime = Math.max(0, t - turnTime),
+        velocityAlong = velocity.x * dirX + velocity.z * dirZ,
+        initialSpeed =
+          turnAngle < 0.8
+            ? Math.max(0, velocityAlong)
+            : Math.max(0, velocityAlong) * 0.35,
+        acceleration =
+          8.5 +
+          skill * 6.5 +
+          (car.boost > 0 ? 3 + skill * 3 : 0) +
+          (airborne ? aerialSkill * 3 : 0),
+        reachable = Math.min(
+          car.maxLinearSpeed * driveTime,
+          initialSpeed * driveTime + 0.5 * acceleration * driveTime * driveTime,
+        ),
+        distanceNeeded = Math.max(0, distance - 1.2),
+        deficit = distanceNeeded - reachable,
+        requiredRise = Math.max(0, by - (p.y + 0.95)),
+        aerialReach =
+          1.55 +
+          aerialSkill * 0.65 +
+          (aerialSkill > 0.65 ? 0.5 * 5.6 * Math.max(0, t - 0.32) ** 2 : 0),
+        heightReachable = !airborne || requiredRise <= aerialReach,
+        feasible = deficit <= 0 && heightReachable,
+        plan: InterceptPlan = {
+          ballX: bx,
+          ballY: by,
+          ballZ: bz,
+          contactX,
+          contactZ,
+          attackX,
+          attackZ,
+          time: t,
+          airborne,
+          ownGoalDanger,
+          feasible,
+        };
+      if (feasible) {
+        const score = t + (ownGoalDanger ? -0.18 : 0) + requiredRise * 0.012;
+        if (score < bestScore) {
+          best = plan;
+          bestScore = score;
+        }
+      }
+      const unreachablePenalty =
+          Math.max(0, deficit) +
+          (heightReachable ? 0 : (requiredRise - aerialReach) * 2.5),
+        score = unreachablePenalty + t * 0.08 + (ownGoalDanger ? 0 : 0.2);
+      if (score < fallbackScore) {
+        fallback = plan;
+        fallbackScore = score;
+      }
+    }
+
+    if (best) return best;
+    if (fallback) return fallback;
+
+    const bx = ball.x,
+      by = Math.max(P.ball.radius, ball.y),
+      bz = ball.z,
+      ownGoalDanger = ownGoalSign * bz > P.arena.halfLength - 18,
+      targetX = ownGoalDanger
+        ? bx >= 0
+          ? -P.arena.goalHalf * 1.7
+          : P.arena.goalHalf * 1.7
+        : shotTargetX,
+      aimX = targetX - bx,
+      aimZ = attackingGoalZ - bz,
+      length = Math.hypot(aimX, aimZ) || 1,
+      attackX = aimX / length,
+      attackZ = aimZ / length;
+    return {
+      ballX: bx,
+      ballY: by,
+      ballZ: bz,
+      contactX: bx - attackX * 1.8,
+      contactZ: bz - attackZ * 1.8,
+      attackX,
+      attackZ,
+      time: 0.2,
+      airborne: by > 2.05,
+      ownGoalDanger,
+      feasible: false,
+    };
   }
 }
