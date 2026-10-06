@@ -731,6 +731,7 @@ async function boot() {
                     simulation.cars[1],
                     simulation.ball.translation(),
                     simulation.clock,
+                    simulation.ball.linvel(),
                   ),
             ]);
           if (match.mode === "rings") {
