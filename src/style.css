@@ -376,21 +376,6 @@ h1 span {
   color: #bad8e2;
   letter-spacing: 0.12em;
 }
-.lumen-field::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image:
-    url("/assets/lumen-historic-facades.jpeg"),
-    url("/assets/lumen-color-facades.jpeg");
-  background-repeat: no-repeat;
-  background-size: 56% auto, 56% auto;
-  background-position: 6% 32%, 94% 32%;
-  mix-blend-mode: multiply;
-  opacity: 0.95;
-}
 .lumen-field {
   background-image:
     linear-gradient(0deg, #07131be8, #10233522 75%),
@@ -1401,14 +1386,40 @@ output {
   padding: clamp(16px, 5vh, 60px) clamp(18px, 6vw, 180px);
 }
 #garage-screen,
-#modes {
+#modes,
+#fields {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: clamp(12px, 3vh, 32px);
 }
+#modes {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+#fields {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
 #garage-screen > h2,
-#modes > h2 {
+#modes > h2,
+#fields > h2 {
   font-size: clamp(26px, 4vh, 42px);
+}
+.mode-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #517184;
+}
+.mode-tabs button {
+  padding: 10px 22px;
+  color: #b5d0dc;
+  background: #112436;
+  border: 1px solid #3e6075;
+  border-bottom: 0;
+  letter-spacing: .13em;
+}
+.mode-tabs button[aria-pressed="true"] {
+  color: #092330;
+  background: linear-gradient(110deg, #a9f5f4, #5cbfd6);
+  border-color: #a9f5f4;
 }
 .screen-footer {
   position: relative;
@@ -1455,12 +1466,44 @@ output {
   max-height: 100%;
   overflow: auto;
 }
+.standard-mode-grid {
+  margin-top: 0;
+}
+.extra-mode-grid {
+  grid-template-columns: minmax(240px, 390px);
+  justify-content: center;
+  align-items: center;
+  margin-top: 0;
+}
+.field-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(130px, 1fr);
+  gap: 14px;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+}
 .mode-card {
   height: clamp(130px, 28vh, 300px);
   min-width: 0;
 }
 .cpu-level-control { display:flex; align-items:center; justify-content:center; gap:12px; color:#b9e5ed; letter-spacing:.12em; font-weight:700; }
 .cpu-level-control select { padding:10px 14px; color:#effaff; background:#17344a; border:1px solid #6ca9c2; font:inherit; }
+.lumen-field {
+  background-image: linear-gradient(0deg,#07131be8,#10233522 75%), radial-gradient(ellipse at 55% 95%,#d8b178 0,transparent 42%), linear-gradient(145deg,#6a8292,#243948 55%,#0f202d);
+}
+.neo-field {
+  background-image: linear-gradient(0deg,#07131be8,#10233522 75%), repeating-linear-gradient(90deg,transparent 0 28px,#85e5ff36 29px 31px), linear-gradient(145deg,#10192a,#704b69 48%,#132e45);
+}
+.dune-field {
+  background-image: linear-gradient(0deg,#16120ce8,#31231320 75%), radial-gradient(ellipse at 58% 86%,#f5c56e 0,transparent 42%), linear-gradient(145deg,#eabf72,#93613b 50%,#3a2e2a);
+}
+.rainforest-field {
+  background-image: linear-gradient(0deg,#07150fe8,#10231a22 75%), radial-gradient(ellipse at 50% 88%,#68b957 0,transparent 38%), repeating-linear-gradient(110deg,transparent 0 40px,#1c563a 41px 52px), linear-gradient(145deg,#183b30,#37684a 50%,#102729);
+}
+.coliseum-field {
+  background-image: linear-gradient(0deg,#080e1bea,#10233510 74%), radial-gradient(ellipse at 50% 80%,#f4d179 0,transparent 38%), repeating-linear-gradient(90deg,transparent 0 31px,#86dcff2a 32px 34px), linear-gradient(145deg,#243953,#536a87 48%,#121e36);
+}
 #settings[open] {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);

@@ -145,6 +145,111 @@ function cityBillboardTexture(index: number) {
   const texture = new T.CanvasTexture(canvas); texture.colorSpace = T.SRGBColorSpace; texture.anisotropy = 4;
   return texture;
 }
+function fieldGroundTexture(kind: "desert" | "rainforest") {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 512;
+  const ctx = canvas.getContext("2d")!;
+  const desert = kind === "desert",
+    gradient = ctx.createLinearGradient(0, 0, 512, 512);
+  if (desert) {
+    gradient.addColorStop(0, "#c98a4f");
+    gradient.addColorStop(0.5, "#e3b56d");
+    gradient.addColorStop(1, "#a96d45");
+  } else {
+    gradient.addColorStop(0, "#103d35");
+    gradient.addColorStop(0.5, "#246344");
+    gradient.addColorStop(1, "#102e34");
+  }
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 512, 512);
+  let seed = desert ? 19071 : 30793;
+  const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000);
+  for (let i = 0; i < 3000; i++) {
+    const x = random() * 512, y = random() * 512, r = 2 + random() * 18;
+    ctx.fillStyle = desert
+      ? i % 2 ? "rgba(255,222,153,.1)" : "rgba(89,48,27,.1)"
+      : i % 2 ? "rgba(131,184,83,.11)" : "rgba(1,19,24,.15)";
+    ctx.beginPath(); ctx.ellipse(x, y, r * (desert ? 2.7 : 1.5), r, random() * 3, 0, Math.PI * 2); ctx.fill();
+  }
+  const texture = new T.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = T.RepeatWrapping;
+  texture.repeat.set(14, 18);
+  texture.colorSpace = T.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+}
+function drawDuneCrown(parent: T.Object3D) {
+  const environment = new T.Group(),
+    stone = new T.MeshStandardMaterial({ color: 0xd4a46b, roughness: 0.9 }),
+    capStone = new T.MeshStandardMaterial({ color: 0xe7c48e, roughness: 0.8 }),
+    dune = new T.MeshStandardMaterial({ color: 0xd09b61, roughness: 1 });
+  parent.add(environment);
+  const pyramid = (x: number, z: number, radius: number, height: number) => {
+    const base = new T.Mesh(new T.ConeGeometry(radius, height, 4), stone);
+    base.position.set(x, height / 2, z); base.rotation.y = Math.PI / 4;
+    base.castShadow = base.receiveShadow = true; environment.add(base);
+    const cap = new T.Mesh(new T.ConeGeometry(radius * 0.8, height * 0.8, 4), capStone);
+    cap.position.set(x, height * 0.43, z); cap.rotation.y = Math.PI / 4; cap.castShadow = true; environment.add(cap);
+  };
+  // All structures are beyond the end walls; none enter the playable bounds.
+  pyramid(0, -119, 24, 34); pyramid(-32, -110, 15, 22); pyramid(34, -112, 17, 24);
+  pyramid(0, 119, 22, 32); pyramid(-34, 111, 15, 22); pyramid(35, 111, 18, 25);
+  for (const side of [-1, 1]) for (let i = 0; i < 7; i++) {
+    const mound = new T.Mesh(new T.SphereGeometry(1, 18, 12), dune);
+    mound.position.set(side * (68 + i * 7), -1.4, -72 + i * 24);
+    mound.scale.set(24, 7 + (i % 3) * 2, 18); environment.add(mound);
+  }
+  return environment;
+}
+function drawEmeraldCanopy(parent: T.Object3D) {
+  const environment = new T.Group(); parent.add(environment);
+  const trunks = new T.InstancedMesh(new T.CylinderGeometry(.32, .62, 1, 7), new T.MeshStandardMaterial({ color: 0x49392b, roughness: 1 }), 72),
+    leaves = new T.InstancedMesh(new T.DodecahedronGeometry(1, 1), new T.MeshStandardMaterial({ color: 0x3f7850, roughness: .9, vertexColors: true }), 216),
+    dummy = new T.Object3D();
+  trunks.castShadow = leaves.castShadow = true;
+  let seed = 10017, leafIndex = 0;
+  const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000);
+  for (let i = 0; i < 72; i++) {
+    const side = i % 2 ? -1 : 1, x = side * (59 + random() * 48), z = -116 + random() * 232, height = 15 + random() * 16;
+    // Tree trunks remain at least 17 world units outside the side walls.
+    dummy.position.set(x, height / 2, z); dummy.scale.set(1, height, 1); dummy.rotation.y = random() * 6; dummy.updateMatrix(); trunks.setMatrixAt(i, dummy.matrix);
+    const hue = new T.Color().setHSL(.27 + random() * .08, .5, .34);
+    for (let cluster = 0; cluster < 3; cluster++) {
+      const angle = cluster * Math.PI * 2 / 3 + random(), spread = 1.7 + random() * 1.2;
+      dummy.position.set(x + Math.cos(angle) * spread, height + random() * 2.8, z + Math.sin(angle) * spread);
+      dummy.scale.set(3.5 + random() * 2, 3.5 + random() * 2, 3.5 + random() * 2); dummy.rotation.y = angle; dummy.updateMatrix();
+      leaves.setMatrixAt(leafIndex, dummy.matrix); leaves.setColorAt(leafIndex++, hue.clone().offsetHSL((random() - .5) * .05, 0, (random() - .5) * .1));
+    }
+  }
+  leaves.count = leafIndex; trunks.instanceMatrix.needsUpdate = leaves.instanceMatrix.needsUpdate = true;
+  if (leaves.instanceColor) leaves.instanceColor.needsUpdate = true;
+  environment.add(trunks, leaves);
+  const stone = new T.MeshStandardMaterial({ color: 0x59634b, roughness: .92 });
+  for (const side of [-1, 1]) for (let level = 0; level < 4; level++) {
+    const block = new T.Mesh(new T.BoxGeometry(16 - level * 2.3, 1.8, 12 - level * 1.8), stone);
+    block.position.set(side * 48, 1 + level * 1.8, -89); block.castShadow = true; environment.add(block);
+  }
+  return environment;
+}
+function drawApexColiseum(parent: T.Object3D) {
+  const environment = new T.Group(); parent.add(environment);
+  const crowd = new T.InstancedMesh(new T.SphereGeometry(1, 8, 7), new T.MeshStandardMaterial({ color: 0xffffff, roughness: .56, vertexColors: true }), 900),
+    dummy = new T.Object3D(), colors = [0x42b9c8, 0xe58659, 0xf0d27b, 0xe9edf0, 0x536eaa, 0x75a86a];
+  crowd.castShadow = true;
+  let seed = 81173, count = 0; const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000);
+  for (const side of [-1, 1]) for (let tier = 0; tier < 7; tier++) for (let z = -49; z <= 49; z += 2.15) {
+    dummy.position.set(side * (45 + tier * 2.55), 4.15 + tier * 1.4, z + (random() - .5) * .4);
+    dummy.scale.set(.36, .53, .34); dummy.rotation.y = random() * Math.PI; dummy.updateMatrix();
+    crowd.setMatrixAt(count, dummy.matrix); crowd.setColorAt(count++, new T.Color(colors[Math.floor(random() * colors.length)]));
+  }
+  crowd.count = count; crowd.instanceMatrix.needsUpdate = true; if (crowd.instanceColor) crowd.instanceColor.needsUpdate = true;
+  environment.add(crowd);
+  const roof = new T.Mesh(new T.TorusGeometry(1, .026, 8, 160), new T.MeshStandardMaterial({ color: 0x9ae8f4, emissive: 0x2b8da8, emissiveIntensity: .72, metalness: .56, roughness: .32 }));
+  roof.rotation.x = Math.PI / 2; roof.scale.set(53, 91, 1); roof.position.y = 32; environment.add(roof);
+  const ribbon = new T.Mesh(new T.TorusGeometry(1, .08, 5, 160), new T.MeshBasicMaterial({ color: 0xffbb64 }));
+  ribbon.rotation.x = Math.PI / 2; ribbon.scale.set(47, 83, 1); ribbon.position.y = 13; environment.add(ribbon);
+  return environment;
+}
 function detailedTurfTextures() {
   const size = 4096,
     colorCanvas = document.createElement("canvas"),
@@ -443,29 +548,44 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
   group.add(floor);
   const neoTokyo = drawNeoTokyo(group);
   neoTokyo.visible = false;
+  const duneCrown = drawDuneCrown(group),
+    emeraldCanopy = drawEmeraldCanopy(group),
+    apexColiseum = drawApexColiseum(group);
+  duneCrown.visible = emeraldCanopy.visible = apexColiseum.visible = false;
   let neoGround: T.CanvasTexture | undefined,
+    fieldGrounds: Partial<Record<"dune-crown" | "emerald-canopy", T.CanvasTexture>> = {},
+    cityEnvironment: T.Group | undefined,
     field: ArenaField = "lumen";
   const setField = (field: ArenaField) => {
     const isNeoTokyo = field === "neo-tokyo";
     if (isNeoTokyo) neoGround ??= neoTokyoGroundTexture();
+    const isDesert = field === "dune-crown",
+      isForest = field === "emerald-canopy",
+      isCustomGround = isDesert || isForest;
+    if (isDesert && !fieldGrounds["dune-crown"])
+      fieldGrounds["dune-crown"] = fieldGroundTexture("desert");
+    if (isForest && !fieldGrounds["emerald-canopy"])
+      fieldGrounds["emerald-canopy"] = fieldGroundTexture("rainforest");
+    const detailed = quality === "ultra" || quality === "cinematic";
     floorMaterial.map = isNeoTokyo
       ? neoGround!
-      : quality === "ultra" || quality === "cinematic"
-        ? detailedTurf!.map
-        : baseTurf;
-    floorMaterial.bumpMap = isNeoTokyo
-      ? null
-      : quality === "ultra" || quality === "cinematic"
-        ? detailedTurf!.bumpMap
-        : null;
-    floorMaterial.bumpScale = isNeoTokyo ? 0 : quality === "ultra" || quality === "cinematic" ? 0.018 : 0;
+      : isCustomGround
+        ? fieldGrounds[isDesert ? "dune-crown" : "emerald-canopy"]!
+        : detailed
+          ? detailedTurf!.map
+          : baseTurf;
+    floorMaterial.bumpMap = isNeoTokyo || isCustomGround ? null : detailed ? detailedTurf!.bumpMap : null;
+    floorMaterial.bumpScale = isNeoTokyo || isCustomGround ? 0 : detailed ? 0.018 : 0;
     floorMaterial.color.setHex(isNeoTokyo ? 0xc3d2d7 : 0xffffff);
-    floorMaterial.roughness = isNeoTokyo ? 0.38 : 0.95;
+    floorMaterial.roughness = isNeoTokyo ? 0.38 : isDesert ? 0.88 : isForest ? 0.95 : 0.95;
     floorMaterial.needsUpdate = true;
     neoTokyo.visible = isNeoTokyo;
-    grass.visible = !isNeoTokyo;
+    duneCrown.visible = isDesert;
+    emeraldCanopy.visible = isForest;
+    apexColiseum.visible = field === "apex-coliseum";
+    if (cityEnvironment) cityEnvironment.visible = field === "lumen";
+    grass.visible = !isNeoTokyo && !isDesert;
   };
-  setField("lumen");
   const stripe = new T.MeshBasicMaterial({
     color: 0x5ac7ac,
     transparent: true,
@@ -692,8 +812,10 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
     line([new T.Vector3(x, 20.4, -48), new T.Vector3(x, 20.4, 48)], gridMat);
   for (let z = -48; z <= 48; z += 6)
     line([new T.Vector3(-38, 20.4, z), new T.Vector3(38, 20.4, z)], gridMat);
-  const setCityQuality = drawCity(group);
-  setCityQuality(quality);
+  const lumenCity = drawCity(group);
+  cityEnvironment = lumenCity.group;
+  lumenCity.setQuality(quality);
+  setField(field);
   let cityQuality = quality;
   return {
     setQuality(next: Quality) {
@@ -702,7 +824,7 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
       setField(field);
       if (cityQuality !== next) {
         cityQuality = next;
-        setCityQuality(next);
+        lumenCity.setQuality(next);
       }
     },
     setField(next: ArenaField) {
@@ -745,20 +867,6 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
 function drawNeoTokyo(parent: T.Object3D) {
   const city = new T.Group(),
     facade = new T.MeshBasicMaterial({ map: cityFacadeTexture(), side: T.DoubleSide }),
-    sakuraTextures = [
-      "/assets/neo-sakura-realistic.png",
-      "/assets/neo-sakura-lowpoly.png",
-    ].map((url) => {
-      const texture = new T.TextureLoader().load(url);
-      texture.colorSpace = T.SRGBColorSpace;
-      texture.anisotropy = 4;
-      return new T.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        alphaTest: 0.06,
-        side: T.DoubleSide,
-      });
-    }),
     structure = new T.MeshStandardMaterial({
       color: 0x263647,
       metalness: 0.5,
@@ -786,17 +894,7 @@ function drawNeoTokyo(parent: T.Object3D) {
       metalness: 0.25,
     });
   parent.add(city);
-  // Use the supplied still of Neo Tokyo as a distant skyline panel beyond
-  // the end of the arena. Keep it as a real static image rather than a
-  // procedural stand-in.
-  const skyline = new T.TextureLoader().load("/assets/neo-tokyo-standard.webp");
-  skyline.colorSpace = T.SRGBColorSpace;
-  const skylinePanel = new T.Mesh(
-    new T.PlaneGeometry(88, 49.6),
-    new T.MeshBasicMaterial({ map: skyline, toneMapped: false }),
-  );
-  skylinePanel.position.set(0, 22, -P.arena.halfLength - 43);
-  city.add(skylinePanel);
+  // Procedural skyline towers and lit facades keep this field self-contained.
   for (const side of [-1, 1]) {
     for (let i = 0; i < 10; i++) {
       const z = -48 + i * 10.5,
@@ -841,18 +939,18 @@ function drawNeoTokyo(parent: T.Object3D) {
       box(city, [0.32, 0.2, 16], [side * 43.5, 27, z], trim).castShadow = false;
     }
     box(city, [0.45, 0.45, 108], [side * 43, 0.15, 0], trim).castShadow = false;
-    // Keep planters and the supplied sakura sprites clearly outside the
-    // playable field; their artwork contains its own trunk and canopy.
+    // Decorative blossom trees stay outside the playable side wall.
     for (let i = 0; i < 9; i++) {
       const z = -47 + i * 11.5, x = side * (P.arena.halfWidth + 3.4);
       box(city, [1.5, 0.42, 3.4], [x, 0.2, z], structure).castShadow = false;
-      const tree = new T.Mesh(
-        new T.PlaneGeometry(4.4, 5.5),
-        sakuraTextures[i % sakuraTextures.length],
-      );
-      tree.position.set(x, 2.8, z);
-      tree.rotation.y = -side * Math.PI / 2;
-      city.add(tree);
+      const trunk = new T.Mesh(new T.CylinderGeometry(0.16, 0.27, 2.6, 7), new T.MeshStandardMaterial({ color: 0x554237, roughness: 1 }));
+      trunk.position.set(x, 1.5, z); trunk.castShadow = true; city.add(trunk);
+      for (let petal = 0; petal < 5; petal++) {
+        const angle = petal * Math.PI * 2 / 5,
+          crown = new T.Mesh(new T.SphereGeometry(1, 10, 8), new T.MeshStandardMaterial({ color: petal % 2 ? 0xec9bb7 : 0xf6bfd0, roughness: 0.86 }));
+        crown.position.set(x + Math.cos(angle) * 1.1, 3.2 + (petal % 2) * 0.5, z + Math.sin(angle) * 1.1);
+        crown.scale.set(1.2, 0.85, 1.2); crown.castShadow = true; city.add(crown);
+      }
     }
   }
   const arch = new T.Mesh(
@@ -876,7 +974,7 @@ function drawCity(scene: T.Object3D) {
   const city = new T.Group();
   scene.add(city);
   const concrete = material(0x243343, 0.5, 0.7),
-    brickFacade = new T.TextureLoader().load("/assets/lumen-brick-facade.jpg"),
+    brickFacade = cityFacadeTexture(),
     facade = material(0xffffff, 0.12, 0.86),
     trim = material(0x405469, 0.6, 0.4);
   brickFacade.colorSpace = T.SRGBColorSpace;
@@ -958,15 +1056,18 @@ function drawCity(scene: T.Object3D) {
   moon.position.set(-65, 75, -130);
   city.add(moon);
   let cinematicDistrict: T.Group | undefined;
-  return (quality: Quality) => {
-    const detailed = quality === "ultra" || quality === "cinematic";
-    facade.bumpMap = detailed ? brickFacade : null;
-    facade.bumpScale = detailed ? 0.018 : 0;
-    facade.needsUpdate = true;
-    if (quality === "cinematic") {
-      cinematicDistrict ??= drawCinematicDistrict(city);
-      cinematicDistrict.visible = true;
-    } else if (cinematicDistrict) cinematicDistrict.visible = false;
+  return {
+    group: city,
+    setQuality(quality: Quality) {
+      const detailed = quality === "ultra" || quality === "cinematic";
+      facade.bumpMap = detailed ? brickFacade : null;
+      facade.bumpScale = detailed ? 0.018 : 0;
+      facade.needsUpdate = true;
+      if (quality === "cinematic") {
+        cinematicDistrict ??= drawCinematicDistrict(city);
+        cinematicDistrict.visible = true;
+      } else if (cinematicDistrict) cinematicDistrict.visible = false;
+    },
   };
 }
 

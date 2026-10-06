@@ -6,6 +6,7 @@ import {
   type AccountData,
 } from "../../shared/accounts.js";
 import {
+  arenaFields,
   partyAlphabet,
   partyModes,
   teamCapacity,
@@ -434,7 +435,7 @@ export function registerParties(
     if (!party || party.hostId !== p.member.id)
       return fail(403, "ONLY THE HOST CAN CHANGE THE FIELD");
     if (party.game?.status === "playing") return fail(409, "MATCH IN PROGRESS");
-    if (field !== "lumen" && field !== "neo-tokyo")
+    if (!arenaFields.some(({ id }) => id === field))
       return fail(400, "INVALID FIELD");
     party.field = field;
     return state(p);

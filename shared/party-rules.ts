@@ -5,6 +5,7 @@ import type {
   PartyStage,
   PartyState,
 } from "./party.js";
+import { arenaFields } from "./party.js";
 
 export type PartyLobbyAction =
   | { type: "team"; team: PartyMember["team"] }
@@ -145,7 +146,7 @@ export function applyPartyLobbyAction(
   }
 
   if (action.type === "field") {
-    if (action.field !== "lumen" && action.field !== "neo-tokyo")
+    if (!arenaFields.some(({ id }) => id === action.field))
       return { status: 400, error: "INVALID FIELD" };
     party.field = action.field;
     return {};

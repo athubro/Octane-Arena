@@ -3,7 +3,7 @@ import type { Car } from "../car/car";
 import { neutral, type Controls } from "../input/types";
 import { P } from "../config/physics";
 
-/** A ground-focused rival whose aim, pace and reaction improve with ranked level. */
+/** Ranked rival with progressively faster reads, cleaner hits, and aerial play. */
 export class Opponent {
   name = "";
   level = 3;
@@ -16,7 +16,12 @@ export class Opponent {
   private sideStep = new Vector3();
   private toOpponent = new Vector3();
   private localOpponent = new Vector3();
+  private aerialPoint = new Vector3();
+  private aerialLocal = new Vector3();
+  private aerialAim = new Vector3();
   private nextJump = 0;
+  private aerialLaunchedAt = -Infinity;
+  private aerialDoubleUsed = false;
   constructor() {
     this.rename();
   }
@@ -76,6 +81,42 @@ export class Opponent {
     const error = (1 - skill) * 1.05;
     this.target.x += Math.sin(time * (1.3 + skill) + car.team * 3) * error;
     this.target.z += Math.sin(time * 0.83 + car.team) * error * 0.7;
+
+    // Skilled ranks project the ball's flight and drive to a shot line where
+    // the car can meet it. The reachable window grows with rank and boost.
+    const aerialSkill = Math.max(0, Math.min(1, (this.level - 5) / 5));
+    let interceptTime = 0,
+      interceptScore = Infinity;
+    if (aerialSkill > 0 && ball.y > 2.25) {
+      const velocity = car.body.linvel(),
+        speed = Math.hypot(velocity.x, velocity.y, velocity.z),
+        reachBonus = 2.4 + aerialSkill * 2.8 + Math.min(car.boost, 60) * 0.035;
+      for (let flight = 0.32; flight <= 1.55; flight += 0.06) {
+        const bx = ball.x + ballVelocity.x * flight,
+          by = ball.y + ballVelocity.y * flight - 0.5 * P.gravity * flight * flight,
+          bz = ball.z + ballVelocity.z * flight;
+        if (by < 2.15 || by > P.arena.goalHeight + 8) continue;
+        const aimX = -bx,
+          aimZ = car.team === 0
+            ? -(P.arena.halfLength + 5 - bz)
+            : P.arena.halfLength + 5 - bz,
+          aimLength = Math.hypot(aimX, aimZ) || 1,
+          contactX = bx - (aimX / aimLength) * (1.25 + (1 - aerialSkill) * 0.3),
+          contactZ = bz - (aimZ / aimLength) * (1.25 + (1 - aerialSkill) * 0.3),
+          distance = Math.hypot(contactX - p.x, by - p.y, contactZ - p.z),
+          reachable = (speed + 5 + aerialSkill * 5) * flight +
+            0.5 * (3 + aerialSkill * 9) * flight * flight + reachBonus;
+        if (distance > reachable * (0.82 + aerialSkill * 0.13)) continue;
+        const score = flight * 0.78 + distance / Math.max(1, reachable) + Math.abs(by - 3) * 0.012;
+        if (score >= interceptScore) continue;
+        interceptScore = score;
+        interceptTime = flight;
+        this.aerialPoint.set(contactX, by - 0.15, contactZ);
+        this.aerialAim.set(aimX / aimLength, 0, aimZ / aimLength);
+      }
+    }
+    const hasAerialIntercept = Number.isFinite(interceptScore);
+    if (hasAerialIntercept) this.target.set(this.aerialPoint.x, 0, this.aerialPoint.z);
 
     // Route around a rival who is standing in the driving line. The bot
     // contests the ball, but does not turn a normal approach into a demo run.
@@ -160,22 +201,50 @@ export class Opponent {
       c.steer = -nearestSide * 0.85;
     }
 
-    // Jump only for reachable balls; stronger ranks react sooner and reach
-    // higher, while weaker ranks mostly contest low bouncing balls.
+    // Low ranks contest simple hops. Higher ranks time aerial takeoffs against
+    // the predicted ball instead of jumping at its current position.
     const ballDistance = Math.hypot(ball.x - p.x, ball.z - p.z);
-    const jumpHeight = 1.7 + skill * 2.7;
-    const jumpRange = 2.3 + skill * 1.2;
-    if (
-      ball.y > 1.45 &&
-      ball.y < jumpHeight &&
-      ballDistance < jumpRange &&
-      car.grounded &&
-      time > this.nextJump
-    ) {
-      c.jump = true;
-      this.nextJump = time + 1.25 - skill * 0.3;
+    const jumpHeight = 1.7 + skill * 2.7,
+      jumpRange = 2.3 + skill * 1.2,
+      aerialActive = time - this.aerialLaunchedAt < 1.6;
+    if (car.grounded && time > this.nextJump) {
+      const launchDistance = Math.hypot(this.aerialPoint.x - p.x, this.aerialPoint.z - p.z),
+        launchAerial = aerialSkill > 0 && hasAerialIntercept &&
+          launchDistance < 3.8 + aerialSkill * 4.4 && interceptTime > 0.25;
+      if (launchAerial) {
+        c.jump = true;
+        this.aerialLaunchedAt = time;
+        this.aerialDoubleUsed = false;
+        this.nextJump = time + 1.65 - aerialSkill * 0.35;
+      } else if (
+        !hasAerialIntercept && ball.y > 1.45 && ball.y < jumpHeight &&
+        ballDistance < jumpRange && aerialSkill < 0.6
+      ) {
+        c.jump = true;
+        this.nextJump = time + 1.25 - skill * 0.3;
+      }
     }
-    if (!car.grounded) {
+    const aerialAge = time - this.aerialLaunchedAt;
+    if (aerialActive && aerialAge >= 0 && !car.grounded) {
+      // Hold the first jump for height, then use a clean second impulse.
+      c.jump = aerialAge < 0.17;
+      if (aerialAge >= 0.25 && aerialAge < 0.27 && !this.aerialDoubleUsed) {
+        c.jump = true;
+        this.aerialDoubleUsed = true;
+      }
+      this.aerialLocal.copy(this.aerialPoint).sub(p).applyQuaternion(
+        this.inverse.copy(car.body.rotation()).invert(),
+      );
+      const horizontal = Math.hypot(this.aerialLocal.x, this.aerialLocal.z),
+        yawError = Math.atan2(this.aerialLocal.x, -this.aerialLocal.z),
+        pitchError = Math.atan2(this.aerialLocal.y, Math.max(0.2, horizontal));
+      c.pitch = Math.max(-1, Math.min(1, -pitchError * (1.1 + aerialSkill * 0.55)));
+      c.yaw = Math.max(-1, Math.min(1, yawError * (1.05 + aerialSkill * 0.45)));
+      c.roll = Math.max(-0.55, Math.min(0.55, car.right.y * 0.55));
+      c.throttle = 1;
+      c.boost = car.boost > 0 && Math.abs(yawError) < 1.05 && Math.abs(pitchError) < 0.9 &&
+        (this.aerialPoint.y > p.y || aerialAge < 0.6);
+    } else if (!car.grounded) {
       c.pitch = car.forward.y > 0.05 ? 0.3 : -0.22;
       c.roll = car.right.y * 0.65;
     }

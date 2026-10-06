@@ -4,6 +4,7 @@ import {
   arenaFields,
   partyModes,
   validPartyCode,
+  type ArenaField,
   type MatchSnapshot,
   type PartyMode,
   type PartyReply,
@@ -17,7 +18,7 @@ const modeSchema = z.enum(
 );
 const stageSchema = z.enum(["home", "mode", "teams"] satisfies PartyStage[]);
 const fieldSchema = z.enum(
-  arenaFields.map(({ id }) => id) as ["lumen", "neo-tokyo"],
+  arenaFields.map(({ id }) => id) as [ArenaField, ...ArenaField[]],
 );
 const inputSchema = z
   .object({

@@ -416,6 +416,8 @@ async function boot() {
     audio.unlock();
     ui.modes(true);
   });
+  ui.on("standard-modes-tab", () => ui.modeTab(false));
+  ui.on("extra-modes-tab", () => ui.modeTab(true));
   const chooseMode = (mode: "bot" | "freeplay" | "rings") => {
     pendingMode = mode;
     rankedQueue = false;

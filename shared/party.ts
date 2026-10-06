@@ -6,10 +6,18 @@ export const normalizePartyCode = (code: string) =>
 export const validPartyCode = (code: string) =>
   /^[A-HJKMNP-Z2-9]{5,6}$/.test(code);
 export type PartyMode = "1v1" | "2v2" | "2v2bots";
-export type ArenaField = "lumen" | "neo-tokyo";
+export type ArenaField =
+  | "lumen"
+  | "neo-tokyo"
+  | "dune-crown"
+  | "emerald-canopy"
+  | "apex-coliseum";
 export const arenaFields: { id: ArenaField; label: string }[] = [
   { id: "lumen", label: "Lumen District" },
   { id: "neo-tokyo", label: "Neo Tokyo" },
+  { id: "dune-crown", label: "Dune Crown" },
+  { id: "emerald-canopy", label: "Emerald Canopy" },
+  { id: "apex-coliseum", label: "Apex Coliseum" },
 ];
 export type PartyStage = "home" | "mode" | "teams";
 export const partyModes: { id: PartyMode; label: string }[] = [
