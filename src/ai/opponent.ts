@@ -19,6 +19,7 @@ export class Opponent {
   private aerialPoint = new Vector3();
   private aerialLocal = new Vector3();
   private nextJump = 0;
+  private directCommitUntil = 0;
   private aerialLaunchedAt = -Infinity;
   private aerialDoubleUsed = false;
   constructor() {
@@ -45,6 +46,7 @@ export class Opponent {
 
   reset() {
     this.nextJump = 0;
+    this.directCommitUntil = 0;
     this.aerialLaunchedAt = -Infinity;
     this.aerialDoubleUsed = false;
     this.target.set(0, 0, 0);
@@ -78,8 +80,9 @@ export class Opponent {
       }
     }
 
-    // Better ranks read the ball's momentum and take a cleaner line behind it.
-    const lead = 0.04 + skill * 0.32;
+    // Lead the ball farther away, but stop predicting far ahead at close range.
+    const currentBallDistance = Math.hypot(ball.x - p.x, ball.z - p.z),
+      lead = 0.025 + skill * Math.min(0.18, currentBallDistance / 110);
     this.predictedBall.set(
       ball.x + ballVelocity.x * lead,
       ball.y + ballVelocity.y * lead,
@@ -139,6 +142,17 @@ export class Opponent {
     }
     const hasAerialIntercept = Number.isFinite(interceptScore);
     if (hasAerialIntercept) this.target.set(this.aerialPoint.x, 0, this.aerialPoint.z);
+    const closeShot = skill > 0.78 && currentBallDistance < 4.6 + skill * 3.2 &&
+      (!hasAerialIntercept || ball.y < 4.4 || currentBallDistance < 3.4);
+    if (closeShot) this.directCommitUntil = time + 0.3;
+    const directCommit = closeShot || (skill > 0.78 && time < this.directCommitUntil);
+    if (directCommit) {
+      this.target.set(
+        ball.x + ballVelocity.x * 0.035,
+        0,
+        ball.z + ballVelocity.z * 0.035,
+      );
+    }
 
     // Route around a rival who is standing in the driving line. The bot
     // contests the ball, but does not turn a normal approach into a demo run.
@@ -173,6 +187,9 @@ export class Opponent {
             : Math.sign(this.localOpponent.x);
       }
 
+      // Pro ranks commit through a challenge instead of orbiting the ball to
+      // route around a nearby opponent. Lower ranks still take the safer path.
+      if (skill >= 0.85) continue;
       if (pathLengthSq < 1e-6) continue;
       const along = Math.max(
         0,
@@ -198,12 +215,13 @@ export class Opponent {
     const angle = Math.atan2(this.local.x, -this.local.z);
     const distance = this.local.length();
     const absAngle = Math.abs(angle);
-    const reverse = absAngle > 2.35 && distance < 13;
+    const reverse = skill < 0.85 && absAngle > 2.35 && distance < 13;
     // Modulate throttle while turning so the car can actually follow its line.
     c.steer = Math.max(-1, Math.min(1, angle * (1.45 + skill * 0.8)));
-    c.throttle = reverse ? -0.65 : absAngle > 1.4 ? 0.4 : 1;
+    c.throttle = reverse ? -0.65 : absAngle > 1.4 ? (skill >= 0.85 ? 0.72 : 0.4) : 1;
     if (reverse) c.steer = -c.steer;
-    c.slide = absAngle > 0.9 && Math.abs(car.forwardSpeed) > 7;
+    c.slide = absAngle > 0.9 && Math.abs(car.forwardSpeed) > 7 &&
+      (skill < 0.85 || currentBallDistance > 6);
     const speedLimit = 9 + skill * 14;
     if (!reverse && car.forwardSpeed > speedLimit && absAngle < 0.7)
       c.throttle = 0;
@@ -213,11 +231,11 @@ export class Opponent {
     c.boost =
       car.forwardSpeed < speedLimit - 1 &&
       aligned &&
-      distance > 7 &&
+      distance > (skill >= 0.85 ? 2.8 : 7) &&
       car.boost > boostReserve &&
       (skill > 0.35 || time % 5 < 2.2);
-    if (nearestOpponent < 7) c.boost = false;
-    if (nearestOpponent < 3.3 && nearestClosing > 1.5) {
+    if (nearestOpponent < 7 && skill < 0.85) c.boost = false;
+    if (nearestOpponent < 3.3 && nearestClosing > 1.5 && skill < 0.85) {
       c.boost = false;
       c.throttle = -0.35;
       c.steer = -nearestSide * 0.85;
@@ -225,7 +243,7 @@ export class Opponent {
 
     // Low ranks contest simple hops. Higher ranks time aerial takeoffs against
     // the predicted ball instead of jumping at its current position.
-    const ballDistance = Math.hypot(ball.x - p.x, ball.z - p.z);
+    const ballDistance = currentBallDistance;
     const jumpHeight = 1.7 + skill * 2.7,
       jumpRange = 2.3 + skill * 1.2,
       aerialActive = time - this.aerialLaunchedAt < 1.6;
