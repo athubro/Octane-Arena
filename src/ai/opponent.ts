@@ -43,6 +43,14 @@ export class Opponent {
     this.name = names[Math.floor(Math.random() * names.length)];
   }
 
+  reset() {
+    this.nextJump = 0;
+    this.aerialLaunchedAt = -Infinity;
+    this.aerialDoubleUsed = false;
+    this.target.set(0, 0, 0);
+    this.aerialPoint.set(0, 0, 0);
+  }
+
   sample(
     car: Car,
     ball: { x: number; y: number; z: number },
@@ -53,6 +61,22 @@ export class Opponent {
     const c = neutral();
     const p = car.body.translation();
     const skill = Math.max(0, Math.min(1, (this.level - 1) / 9));
+    let shotTargetX = 0;
+    if (skill > 0.65) {
+      const opponentGoalZ = car.team === 0 ? -P.arena.halfLength : P.arena.halfLength;
+      for (const other of opponents) {
+        if (!other.active || !other.body.isEnabled() || other.team === car.team) continue;
+        const defender = other.body.translation();
+        if (
+          Math.abs(defender.z - opponentGoalZ) < 18 &&
+          Math.abs(defender.x) < P.arena.goalHalf + 5
+        ) {
+          const corner = P.arena.goalHalf * (0.58 + skill * 0.18);
+          shotTargetX = defender.x >= 0 ? -corner : corner;
+          break;
+        }
+      }
+    }
 
     // Better ranks read the ball's momentum and take a cleaner line behind it.
     const lead = 0.04 + skill * 0.32;
@@ -63,7 +87,7 @@ export class Opponent {
     );
     this.attack
       .set(
-        -this.predictedBall.x,
+        shotTargetX - this.predictedBall.x,
         0,
         car.team === 0
           ? -(P.arena.halfLength + 5 - this.predictedBall.z)
@@ -95,7 +119,7 @@ export class Opponent {
           by = ball.y + ballVelocity.y * flight - 0.5 * P.gravity * flight * flight,
           bz = ball.z + ballVelocity.z * flight;
         if (by < 2.15 || by > P.arena.goalHeight + 8) continue;
-        const aimX = -bx,
+        const aimX = shotTargetX - bx,
           aimZ = car.team === 0
             ? -(P.arena.halfLength + 5 - bz)
             : P.arena.halfLength + 5 - bz,

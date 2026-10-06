@@ -185,11 +185,17 @@ function drawDuneCrown(parent: T.Object3D) {
     dune = new T.MeshStandardMaterial({ color: 0xd09b61, roughness: 1 });
   parent.add(environment);
   const pyramid = (x: number, z: number, radius: number, height: number) => {
-    const base = new T.Mesh(new T.ConeGeometry(radius, height, 4), stone);
-    base.position.set(x, height / 2, z); base.rotation.y = Math.PI / 4;
-    base.castShadow = base.receiveShadow = true; environment.add(base);
-    const cap = new T.Mesh(new T.ConeGeometry(radius * 0.8, height * 0.8, 4), capStone);
-    cap.position.set(x, height * 0.43, z); cap.rotation.y = Math.PI / 4; cap.castShadow = true; environment.add(cap);
+    const levels = Math.max(6, Math.round(height / 4)), step = height / levels,
+      geometry = new T.BoxGeometry(1, 1, 1);
+    for (let level = 0; level < levels; level++) {
+      const width = radius * 2 * (1 - level / levels),
+        tier = new T.Mesh(geometry, level === levels - 1 ? capStone : stone);
+      tier.position.set(x, step * (level + 0.5), z);
+      tier.scale.set(width, step * 0.96, width);
+      tier.rotation.y = Math.PI / 4;
+      tier.castShadow = tier.receiveShadow = true;
+      environment.add(tier);
+    }
   };
   // All structures are beyond the end walls; none enter the playable bounds.
   pyramid(0, -119, 24, 34); pyramid(-32, -110, 15, 22); pyramid(34, -112, 17, 24);
@@ -227,7 +233,7 @@ function drawEmeraldCanopy(parent: T.Object3D) {
   const stone = new T.MeshStandardMaterial({ color: 0x59634b, roughness: .92 });
   for (const side of [-1, 1]) for (let level = 0; level < 4; level++) {
     const block = new T.Mesh(new T.BoxGeometry(16 - level * 2.3, 1.8, 12 - level * 1.8), stone);
-    block.position.set(side * 48, 1 + level * 1.8, -89); block.castShadow = true; environment.add(block);
+    block.position.set(side * 59, 1 + level * 1.8, -89); block.castShadow = true; environment.add(block);
   }
   return environment;
 }

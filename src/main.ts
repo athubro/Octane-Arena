@@ -302,6 +302,7 @@ async function boot() {
     rankedSettled = false;
     ringChallenge.start();
     ringCourse.syncActiveGate();
+    opponent.reset();
     opponent.rename();
     simulation.configurePlayers([
       {
