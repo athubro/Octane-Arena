@@ -376,21 +376,6 @@ h1 span {
   color: #bad8e2;
   letter-spacing: 0.12em;
 }
-.lumen-field {
-  background-image:
-    linear-gradient(0deg, #07131be8, #10233522 75%),
-    radial-gradient(ellipse at 50% 85%, #4b9b96 0, transparent 48%),
-    linear-gradient(145deg, #243c4b, #476477 52%, #132330);
-}
-.neo-field {
-  background-image:
-    linear-gradient(0deg, #07131be8, #10233522 75%),
-    url("/assets/neo-tokyo-standard.webp"),
-    repeating-linear-gradient(90deg, transparent 0 24px, #4ceaff44 25px 27px),
-    linear-gradient(145deg, #10192a, #603d52 48%, #132e45);
-  background-size: cover, cover, auto, cover;
-  background-position: center;
-}
 .back-button,
 .small-button {
   background: #22394ee6;

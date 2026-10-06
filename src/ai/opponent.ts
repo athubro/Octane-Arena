@@ -18,7 +18,6 @@ export class Opponent {
   private localOpponent = new Vector3();
   private aerialPoint = new Vector3();
   private aerialLocal = new Vector3();
-  private aerialAim = new Vector3();
   private nextJump = 0;
   private aerialLaunchedAt = -Infinity;
   private aerialDoubleUsed = false;
@@ -112,7 +111,6 @@ export class Opponent {
         interceptScore = score;
         interceptTime = flight;
         this.aerialPoint.set(contactX, by - 0.15, contactZ);
-        this.aerialAim.set(aimX / aimLength, 0, aimZ / aimLength);
       }
     }
     const hasAerialIntercept = Number.isFinite(interceptScore);
