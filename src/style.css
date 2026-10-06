@@ -336,6 +336,9 @@ h1 span {
   margin: 11vh 0 0;
 }
 .field-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   min-height: 250px;
   display: flex;
   flex-direction: column;
@@ -363,11 +366,30 @@ h1 span {
   transform: translateY(-3px);
 }
 .field-card strong {
+  position: relative;
+  z-index: 1;
   font-size: clamp(22px, 2.5vw, 32px);
 }
 .field-card small {
+  position: relative;
+  z-index: 1;
   color: #bad8e2;
   letter-spacing: 0.12em;
+}
+.lumen-field::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    url("/assets/lumen-historic-facades.jpeg"),
+    url("/assets/lumen-color-facades.jpeg");
+  background-repeat: no-repeat;
+  background-size: 56% auto, 56% auto;
+  background-position: 6% 32%, 94% 32%;
+  mix-blend-mode: multiply;
+  opacity: 0.95;
 }
 .lumen-field {
   background-image:
@@ -378,8 +400,11 @@ h1 span {
 .neo-field {
   background-image:
     linear-gradient(0deg, #07131be8, #10233522 75%),
+    url("/assets/neo-tokyo-standard.webp"),
     repeating-linear-gradient(90deg, transparent 0 24px, #4ceaff44 25px 27px),
     linear-gradient(145deg, #10192a, #603d52 48%, #132e45);
+  background-size: cover, cover, auto, cover;
+  background-position: center;
 }
 .back-button,
 .small-button {

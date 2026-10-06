@@ -145,18 +145,6 @@ function cityBillboardTexture(index: number) {
   const texture = new T.CanvasTexture(canvas); texture.colorSpace = T.SRGBColorSpace; texture.anisotropy = 4;
   return texture;
 }
-function treeCanopyTexture() {
-  const canvas = document.createElement("canvas"); canvas.width = canvas.height = 128;
-  const ctx = canvas.getContext("2d")!;
-  let seed = 2718; const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-  for (let i = 0; i < 190; i++) {
-    const r = 5 + random() * 15, x = 16 + random() * 96, y = 16 + random() * 96;
-    ctx.fillStyle = ["#315c48", "#527d57", "#7b965d", "#9b5261"][i % 4];
-    ctx.globalAlpha = .35 + random() * .55; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  const t = new T.CanvasTexture(canvas); t.colorSpace = T.SRGBColorSpace; return t;
-}
 function detailedTurfTextures() {
   const size = 4096,
     colorCanvas = document.createElement("canvas"),
@@ -234,73 +222,6 @@ function detailedTurfTextures() {
     map.wrapS = map.wrapT = T.RepeatWrapping;
     map.repeat.set(14, 18);
     map.anisotropy = 16;
-    if (isColor) map.colorSpace = T.SRGBColorSpace;
-    return map;
-  };
-  return { map: texture(colorCanvas, true), bumpMap: texture(heightCanvas) };
-}
-function facadeTextures() {
-  const size = 2048,
-    colorCanvas = document.createElement("canvas"),
-    heightCanvas = document.createElement("canvas");
-  colorCanvas.width = colorCanvas.height = size;
-  heightCanvas.width = heightCanvas.height = size;
-  const color = colorCanvas.getContext("2d")!,
-    height = heightCanvas.getContext("2d")!;
-  color.fillStyle = "#263642";
-  color.fillRect(0, 0, size, size);
-  height.fillStyle = "#858585";
-  height.fillRect(0, 0, size, size);
-  let seed = 941;
-  const random = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 0x100000000;
-  };
-  for (let row = 0; row < 12; row++) {
-    const y = 18 + row * 83;
-    color.fillStyle = "#354650";
-    color.fillRect(0, y + 65, size, 8);
-    height.fillStyle = "#b0b0b0";
-    height.fillRect(0, y + 65, size, 8);
-    for (let col = 0; col < 8; col++) {
-      const x = 18 + col * 124,
-        w = 88 + random() * 12,
-        lit = random() > 0.7;
-      color.fillStyle = "#111c25";
-      color.fillRect(x - 5, y - 5, w + 10, 60);
-      color.fillStyle = lit ? "#7c7562" : "#315064";
-      color.fillRect(x, y, w, 50);
-      const glass = color.createLinearGradient(x, y, x + w, y + 50);
-      glass.addColorStop(0, lit ? "#d6b77f" : "#52778b");
-      glass.addColorStop(0.48, lit ? "#746d5c" : "#1d3548");
-      glass.addColorStop(1, lit ? "#aa936b" : "#648093");
-      color.fillStyle = glass;
-      color.fillRect(x + 3, y + 3, w - 6, 44);
-      color.fillStyle = "rgba(204, 229, 234, 0.24)";
-      color.fillRect(x + w * 0.16, y + 3, Math.max(2, w * 0.08), 44);
-      color.fillStyle = "#18252e";
-      color.fillRect(x + w / 2 - 1.5, y, 3, 50);
-      height.fillStyle = "#383838";
-      height.fillRect(x - 5, y - 5, w + 10, 60);
-      height.fillStyle = "#b8b8b8";
-      height.fillRect(x - 2, y - 2, w + 4, 54);
-      height.fillStyle = "#707070";
-      height.fillRect(x + 3, y + 3, w - 6, 44);
-      height.fillStyle = "#c4c4c4";
-      height.fillRect(x + w / 2 - 1.5, y, 3, 50);
-    }
-  }
-  for (let i = 0; i < 18000; i++) {
-    const x = random() * size,
-      y = random() * size,
-      shade = Math.floor(24 + random() * 42);
-    color.fillStyle = `rgba(${shade}, ${shade + 8}, ${shade + 12}, ${0.08 + random() * 0.12})`;
-    color.fillRect(x, y, 1 + random() * 2, 1 + random() * 2);
-  }
-  const texture = (canvas: HTMLCanvasElement, isColor = false) => {
-    const map = new T.CanvasTexture(canvas);
-    map.wrapS = map.wrapT = T.RepeatWrapping;
-    map.anisotropy = 8;
     if (isColor) map.colorSpace = T.SRGBColorSpace;
     return map;
   };
@@ -824,7 +745,20 @@ export function drawArena(scene: T.Scene, quality: Quality = "high") {
 function drawNeoTokyo(parent: T.Object3D) {
   const city = new T.Group(),
     facade = new T.MeshBasicMaterial({ map: cityFacadeTexture(), side: T.DoubleSide }),
-    canopy = new T.MeshBasicMaterial({ map: treeCanopyTexture(), transparent: true, alphaTest: 0.08, side: T.DoubleSide }),
+    sakuraTextures = [
+      "/assets/neo-sakura-realistic.png",
+      "/assets/neo-sakura-lowpoly.png",
+    ].map((url) => {
+      const texture = new T.TextureLoader().load(url);
+      texture.colorSpace = T.SRGBColorSpace;
+      texture.anisotropy = 4;
+      return new T.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        alphaTest: 0.06,
+        side: T.DoubleSide,
+      });
+    }),
     structure = new T.MeshStandardMaterial({
       color: 0x263647,
       metalness: 0.5,
@@ -907,14 +841,18 @@ function drawNeoTokyo(parent: T.Object3D) {
       box(city, [0.32, 0.2, 16], [side * 43.5, 27, z], trim).castShadow = false;
     }
     box(city, [0.45, 0.45, 108], [side * 43, 0.15, 0], trim).castShadow = false;
-    // Keep the low planters and canopy cards beyond the playable field.
+    // Keep planters and the supplied sakura sprites clearly outside the
+    // playable field; their artwork contains its own trunk and canopy.
     for (let i = 0; i < 9; i++) {
-      const z = -47 + i * 11.5, x = side * (P.arena.halfWidth + 1.1);
+      const z = -47 + i * 11.5, x = side * (P.arena.halfWidth + 3.4);
       box(city, [1.5, 0.42, 3.4], [x, 0.2, z], structure).castShadow = false;
-      const trunk = new T.Mesh(new T.CylinderGeometry(0.13, 0.22, 2.2, 6), structure);
-      trunk.position.set(x, 1.45, z); trunk.castShadow = false; city.add(trunk);
-      const leaves = new T.Mesh(new T.PlaneGeometry(4.2, 5.4), canopy);
-      leaves.position.set(x, 4.1, z); leaves.rotation.y = side * 0.08; city.add(leaves);
+      const tree = new T.Mesh(
+        new T.PlaneGeometry(4.4, 5.5),
+        sakuraTextures[i % sakuraTextures.length],
+      );
+      tree.position.set(x, 2.8, z);
+      tree.rotation.y = -side * Math.PI / 2;
+      city.add(tree);
     }
   }
   const arch = new T.Mesh(
@@ -938,8 +876,12 @@ function drawCity(scene: T.Object3D) {
   const city = new T.Group();
   scene.add(city);
   const concrete = material(0x243343, 0.5, 0.7),
-    facade = material(0x243343, 0.32, 0.42),
+    brickFacade = new T.TextureLoader().load("/assets/lumen-brick-facade.jpg"),
+    facade = material(0xffffff, 0.12, 0.86),
     trim = material(0x405469, 0.6, 0.4);
+  brickFacade.colorSpace = T.SRGBColorSpace;
+  brickFacade.anisotropy = 8;
+  facade.map = brickFacade;
   const windowMat = new T.MeshStandardMaterial({
     color: 0xf2cb8b,
     emissive: 0x9a6330,
@@ -1016,13 +958,10 @@ function drawCity(scene: T.Object3D) {
   moon.position.set(-65, 75, -130);
   city.add(moon);
   let cinematicDistrict: T.Group | undefined;
-  let textures: ReturnType<typeof facadeTextures> | undefined;
   return (quality: Quality) => {
     const detailed = quality === "ultra" || quality === "cinematic";
-    if (detailed) textures ??= facadeTextures();
-    facade.map = detailed ? textures!.map : null;
-    facade.bumpMap = detailed ? textures!.bumpMap : null;
-    facade.bumpScale = detailed ? 0.055 : 0;
+    facade.bumpMap = detailed ? brickFacade : null;
+    facade.bumpScale = detailed ? 0.018 : 0;
     facade.needsUpdate = true;
     if (quality === "cinematic") {
       cinematicDistrict ??= drawCinematicDistrict(city);
