@@ -40,17 +40,14 @@ export class DribblingChallenge {
   }
 
   advance(position: { x: number; y: number; z: number }) {
-    const target = this.checkpoints[this.progress];
-    if (!target) {
+    while (this.progress < this.checkpoints.length) {
+      const target = this.checkpoints[this.progress];
+      if (position.z > target.z) break;
+      this.progress += 1;
+    }
+    if (this.progress >= this.checkpoints.length) {
       this.completed = true;
       return { complete: true, level: this.level + 1, total: this.levelCount };
-    }
-    if (position.z <= target.z) {
-      this.progress += 1;
-      if (this.progress >= this.checkpoints.length) {
-        this.completed = true;
-        return { complete: true, level: this.level + 1, total: this.levelCount };
-      }
     }
     return {
       complete: false,
