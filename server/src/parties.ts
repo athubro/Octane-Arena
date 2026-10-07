@@ -477,6 +477,8 @@ export function registerParties(
       !assigned ||
       (party.mode === "1v1" &&
         (members.length !== 2 || blue !== 1 || orange !== 1)) ||
+      (party.mode === "heatseeker" &&
+        (members.length !== 2 || blue !== 1 || orange !== 1)) ||
       (party.mode === "2v2" && (members.length < 2 || !blue || !orange)) ||
       (party.mode === "2v2bots" && (!blue || orange))
     )

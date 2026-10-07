@@ -291,6 +291,14 @@ h1 span {
   line-height: 1;
   text-shadow: 0 0 18px #ffbd5680;
 }
+.heatseeker-mode-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  font-size: 54px;
+  filter: drop-shadow(0 0 14px #ff9d4580);
+}
 .mode-card small {
   color: #bfd5e1;
   font-size: 14px;
@@ -1820,7 +1828,7 @@ output {
 #party-flow header,#party-flow footer {display:flex;align-items:center;justify-content:space-between;gap:20px;}
 #party-flow h2 {font-size:clamp(26px,3.5vw,48px);letter-spacing:.05em;margin:0;}
 #party-flow footer {margin-top:auto;}
-.party-mode-cards {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin:auto 0;}
+.party-mode-cards {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px;margin:auto 0;}
 .party-mode-card {min-height:260px;border:1px solid #5a819e;background:linear-gradient(150deg,#1f405bcc,#0d1d32ee);color:#edfaff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,0 100%);transition:background .15s,transform .15s;}
 .party-mode-card strong {font-size:clamp(20px,2.4vw,32px);}
 .party-mode-card[aria-pressed=true] {background:linear-gradient(150deg,#397e98ee,#193956ee);border-color:#b0faff;box-shadow:inset 0 -5px #8df4ff;}

@@ -112,7 +112,7 @@ async function boot() {
   scene.add(sun);
   const arena = drawArena(scene, settings.value.quality);
   let selectedField: ArenaField = "lumen",
-    pendingMode: "bot" | "freeplay" | "rings" = "bot",
+    pendingMode: "bot" | "heatseeker" | "freeplay" | "rings" = "bot",
     pendingTrainingPackId: string | null = null;
   const grassVelocities = simulation.cars.map(() => new T.Vector3());
   const ringCourse = new RingCourseView(scene, ringChallenge);
@@ -285,11 +285,13 @@ async function boot() {
   let rankedQueue = false,
     rankedSettled = false;
   const start = (
-    mode: "bot" | "freeplay" | "rings" = match.mode === "freeplay"
+    mode: "bot" | "heatseeker" | "freeplay" | "rings" = match.mode === "freeplay"
       ? "freeplay"
       : match.mode === "rings"
         ? "rings"
-        : "bot",
+        : match.mode === "heatseeker"
+          ? "heatseeker"
+          : "bot",
   ) => {
     trainingPackRun.stop();
     goalReplay.reset();
@@ -325,6 +327,7 @@ async function boot() {
     const proRankedCpu =
       mode === "bot" && rankedQueue && rankedBot.level === 10;
     match.rankedCpuCannotLose = proRankedCpu;
+    simulation.setHeatseeker(mode === "heatseeker");
     match.start(simulation, mode);
     if (proRankedCpu) simulation.cars[1]?.setProRankedCpu(true);
     if (mode === "rings") {
@@ -399,6 +402,7 @@ async function boot() {
     selectedField = party.state?.field ?? "lumen";
     arena.setField(selectedField);
     simulation.setRingCourse(false);
+    simulation.setHeatseeker(game.mode === "heatseeker");
     arena.setVisible(true);
     ringMap.setVisible(false);
     match.start(simulation, "party");
@@ -442,7 +446,9 @@ async function boot() {
   });
   ui.on("standard-modes-tab", () => ui.modeTab(false));
   ui.on("extra-modes-tab", () => ui.modeTab(true));
-  const chooseMode = (mode: "bot" | "freeplay" | "rings") => {
+  const chooseMode = (
+    mode: "bot" | "heatseeker" | "freeplay" | "rings",
+  ) => {
     pendingMode = mode;
     rankedQueue = false;
     document
@@ -459,6 +465,7 @@ async function boot() {
       );
   };
   ui.on("bot-mode", () => chooseMode("bot"));
+  ui.on("heatseeker-mode", () => chooseMode("heatseeker"));
   ui.on("ranked-mode", () => {
     chooseMode("bot");
     rankedQueue = true;

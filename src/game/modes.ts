@@ -8,6 +8,15 @@ export const modes = {
     infiniteBoost: false,
     goal: "celebrate",
   },
+  heatseeker: {
+    bot: true,
+    scoreboard: true,
+    countdown: 3,
+    clock: true,
+    training: false,
+    infiniteBoost: false,
+    goal: "celebrate",
+  },
   freeplay: {
     bot: false,
     scoreboard: false,

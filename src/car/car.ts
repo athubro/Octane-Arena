@@ -74,7 +74,10 @@ export class Car {
   constructor(public world: RAPIER.World) {
     const c = P.car;
     this.body = world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic().setCanSleep(false).setCcdEnabled(true),
+      RAPIER.RigidBodyDesc.dynamic()
+        .setCanSleep(false)
+        .setCcdEnabled(true)
+        .setSoftCcdPrediction(0.2),
     );
     this.collider = world.createCollider(
       RAPIER.ColliderDesc.cuboid(c.halfWidth, c.halfHeight, c.halfLength)

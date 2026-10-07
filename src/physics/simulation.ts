@@ -43,70 +43,16 @@ function insideGoalTunnel(x: number, y: number, z: number, inset = 0) {
     y <= goalHeight + goalLip - inset
   );
 }
-function carInsideArenaEnvelope(
-  car: Car,
-  x: number,
-  z: number,
-  rotation = car.body.rotation(),
-) {
-  const { halfWidth, halfLength, corner } = P.arena;
-  const dimensions = bodies[car.bodyId];
-  const right = new Vector3(1, 0, 0).applyQuaternion(
-    new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
-  );
-  const forward = new Vector3(0, 0, -1).applyQuaternion(
-    new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
-  );
-  const halfX =
-      Math.abs(right.x) * dimensions.halfWidth +
-      Math.abs(forward.x) * dimensions.halfLength,
-    halfZ =
-      Math.abs(right.z) * dimensions.halfWidth +
-      Math.abs(forward.z) * dimensions.halfLength,
-    ax = Math.abs(x),
-    az = Math.abs(z),
-    cornerX = halfWidth - corner,
-    cornerZ = halfLength - corner,
-    margin = 0.05;
-
-  // Expand the straight walls by the rotated car footprint. At the rounded
-  // corners, expand along the local wall normal instead of using one large
-  // radius for every direction.
-  if (ax <= cornerX && az <= cornerZ) return true;
-  if (ax <= cornerX) return az <= halfLength + halfZ + margin;
-  if (az <= cornerZ) return ax <= halfWidth + halfX + margin;
-  const dx = ax - cornerX,
-    dz = az - cornerZ,
-    distance = Math.hypot(dx, dz);
-  if (distance <= corner || distance === 0) return true;
-  const nx = dx / distance,
-    nz = dz / distance,
-    support =
-      Math.abs(nx * right.x + nz * right.z) * dimensions.halfWidth +
-      Math.abs(nx * forward.x + nz * forward.z) * dimensions.halfLength;
-  return distance <= corner + support + margin;
+function carInsideArenaEnvelope(x: number, z: number) {
+  // This recovery boundary tracks the car center. Expanding it by each
+  // hitbox let a small car escape the shell and gave larger cars a different
+  // recovery point from the visible wall. Keep one shared contact tolerance.
+  return insideRoundedArena(x, z, -0.02);
 }
-function carInsideArenaBounds(
-  car: Car,
-  x: number,
-  y: number,
-  z: number,
-  rotation = car.body.rotation(),
-) {
+function carInsideArenaBounds(x: number, y: number, z: number) {
   return (
     y >= -2.5 &&
-    (carInsideArenaEnvelope(car, x, z, rotation) ||
-      insideGoalTunnel(
-        x,
-        y,
-        z,
-        -(
-          Math.max(
-            bodies[car.bodyId].halfWidth,
-            bodies[car.bodyId].halfLength,
-          ) + 0.05
-        ),
-      ))
+    (carInsideArenaEnvelope(x, z) || insideGoalTunnel(x, y, z, -0.02))
   );
 }
 export class Simulation {
@@ -129,6 +75,9 @@ export class Simulation {
     age: number;
   }[] = [];
   lastTouchId: string | null = null;
+  heatseekerEnabled = false;
+  private heatseekerTargetTeam: number | null = null;
+  private heatseekerTouches = 0;
   private velocities: Vector3[] = [];
   private cooldown: number[] = [];
   private relative: Vector3[] = [];
@@ -156,7 +105,9 @@ export class Simulation {
     this.configuredCount = players.length;
     this.world = new RAPIER.World({ x: 0, y: -P.gravity, z: 0 });
     this.world.timestep = P.dt;
-    this.world.numSolverIterations = 8;
+    this.world.numSolverIterations = 12;
+    this.world.numInternalPgsIterations = 2;
+    this.world.maxCcdSubsteps = 2;
     this.arenaColliders = createArena(this.world, flat);
     this.ringPlatform = createRingPlatform(this.world);
     for (const collider of this.ringPlatform) collider.setCollisionGroups(0);
@@ -203,6 +154,11 @@ export class Simulation {
     for (const collider of this.ringPlatform)
       collider.setCollisionGroups(enabled ? 0xffffffff : 0);
   }
+  setHeatseeker(enabled: boolean) {
+    this.heatseekerEnabled = enabled;
+    this.heatseekerTargetTeam = null;
+    this.heatseekerTouches = 0;
+  }
   reset() {
     this.safeCarTransforms.clear();
     for (const c of this.cars) {
@@ -218,6 +174,8 @@ export class Simulation {
     }
     this.demolitions = [];
     this.lastTouchId = null;
+    this.heatseekerTargetTeam = null;
+    this.heatseekerTouches = 0;
     this.ballCollider.setCollisionGroups(0xffffffff);
     this.ball.setEnabled(true);
     for (const c of this.cars) {
@@ -427,7 +385,7 @@ export class Simulation {
         c.body.isEnabled()
       ) {
         const position = c.body.translation();
-        if (carInsideArenaBounds(c, position.x, position.y, position.z))
+        if (carInsideArenaBounds(position.x, position.y, position.z))
           this.rememberSafeCarTransform(c);
       }
       c.pose.before();
@@ -488,6 +446,7 @@ export class Simulation {
           });
       }
     });
+    this.steerHeatseekerBall();
     const cap = (body: RAPIER.RigidBody, speed: number, angular: number) => {
       const v = new Vector3().copy(body.linvel()),
         w = new Vector3().copy(body.angvel());
@@ -538,7 +497,7 @@ export class Simulation {
     for (const car of this.cars) {
       if (!car.active || !car.body.isEnabled()) continue;
       const p = car.body.translation();
-      if (carInsideArenaBounds(car, p.x, p.y, p.z)) {
+      if (carInsideArenaBounds(p.x, p.y, p.z)) {
         this.rememberSafeCarTransform(car);
         continue;
       }
@@ -549,15 +508,7 @@ export class Simulation {
       const safe = this.safeCarTransforms.get(car),
         last = safe?.position ?? car.pose.previous,
         lastRotation = safe?.rotation ?? car.pose.previousQ;
-      if (
-        carInsideArenaBounds(
-          car,
-          last.x,
-          last.y,
-          last.z,
-          lastRotation,
-        )
-      ) {
+      if (carInsideArenaBounds(last.x, last.y, last.z)) {
         const displacement =
             p.y < -2.5
               ? new Vector3(0, p.y - last.y, 0)
@@ -581,11 +532,10 @@ export class Simulation {
       // If no safe sample exists, project this pose back into the rounded
       // playable footprint. Do not turn a collision recovery into a respawn.
       const dimensions = bodies[car.bodyId],
-        rotation = new Quaternion().copy(car.body.rotation()),
         velocity = new Vector3().copy(car.body.linvel());
       let x = p.x,
         z = p.z;
-      for (let i = 0; i < 80 && !carInsideArenaEnvelope(car, x, z, rotation); i++) {
+      for (let i = 0; i < 80 && !carInsideArenaEnvelope(x, z); i++) {
         x *= 0.94;
         z *= 0.94;
       }
@@ -655,6 +605,34 @@ export class Simulation {
       strength: closing,
       age: 0,
     });
+    if (this.heatseekerEnabled) this.launchHeatseekerBall(c.team);
+  }
+  private launchHeatseekerBall(team: number) {
+    this.heatseekerTargetTeam = team;
+    this.heatseekerTouches++;
+    const targetZ =
+        (team === 0 ? -1 : 1) *
+        (P.arena.halfLength + P.arena.goalDepth - 1.2),
+      direction = new Vector3(0, 2.1, targetZ).sub(this.ball.translation());
+    if (direction.lengthSq() < 1e-8)
+      direction.set(0, 0, team === 0 ? -1 : 1);
+    const speed = Math.min(42, 22 + (this.heatseekerTouches - 1) * 2.2);
+    this.ball.setLinvel(direction.normalize().multiplyScalar(speed), true);
+  }
+  private steerHeatseekerBall() {
+    if (!this.heatseekerEnabled || this.heatseekerTargetTeam === null) return;
+    const position = this.ball.translation(),
+      targetZ =
+        (this.heatseekerTargetTeam === 0 ? -1 : 1) *
+        (P.arena.halfLength + P.arena.goalDepth - 1.2),
+      desired = new Vector3(0, 2.1, targetZ).sub(position),
+      velocity = new Vector3().copy(this.ball.linvel()),
+      speed = velocity.length();
+    if (speed < 1e-4 || desired.lengthSq() < 1e-8) return;
+    // A small deterministic steering step curves the ball toward the called
+    // goal after a sidewall rebound without changing its speed.
+    velocity.normalize().lerp(desired.normalize(), 0.018).normalize();
+    this.ball.setLinvel(velocity.multiplyScalar(speed), true);
   }
   private bump(first: number, second: number) {
     const a = this.cars[first],

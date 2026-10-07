@@ -34,133 +34,252 @@ export interface TrainingPackRecord {
 
 export type TrainingPackRecords = Record<string, TrainingPackRecord>;
 
-const timerBases = [
-  18, 17.25, 16.5, 15.75, 15, 14.25, 13.5, 12.75, 12, 11.25, 10.5,
-];
 const packNames = [
-  ["Rookie Warmup", "EASY", "Clean ground shots with generous time."],
-  ["First Touch", "EASY", "Build accuracy from varied starting lanes."],
-  ["Angle School", "CASUAL", "Pick your line around changing ball positions."],
-  ["Moving Targets", "CASUAL", "Read rolling balls and strike through them."],
+  ["Rookie Warmup", "EASY", "Ground shots, gentle rolls, and wide open nets."],
+  ["First Touch", "EASY", "Side lanes and rolling touches introduce shot placement."],
+  ["Angle School", "CASUAL", "Turn awkward wide balls back toward the far post."],
+  ["Moving Targets", "CASUAL", "Read moving crosses, wall rolls, and rising balls."],
   [
     "Aerial Class",
     "INTERMEDIATE",
-    "Take off early and meet the ball in the air.",
+    "Meet high crosses and redirect rebounds before they drop.",
   ],
-  ["Crossbar Lab", "ADVANCED", "Control elevated shots under tighter clocks."],
-  ["Wall Reads", "HARD", "Recover awkward wall passes and rebounds."],
+  ["Crossbar Lab", "ADVANCED", "Clear the bar from high, off-center feeds."],
+  ["Wall Reads", "HARD", "Cannon feeds skim the wall and backboard at bad angles."],
   [
     "Air Control",
     "VERY HARD",
-    "Track fast cannon launches and aerial crosses.",
+    "Fast aerial cannon shots arrive from the ceiling and sidewall.",
   ],
   [
     "Pressure Cooker",
     "VERY HARD",
-    "Short clocks, sharp angles, and late reads.",
+    "Reverse-moving balls, corner rebounds, and narrow far-post lines.",
   ],
-  ["Overtime Trials", "PRO", "Eleven demanding shots with the least time."],
+  ["Overtime Trials", "PRO", "Obscure cannon setups: backboard clears, ceiling drops, and wall redirects."],
 ] as const;
 
+type ShotPattern =
+  | "ground"
+  | "roll"
+  | "diagonal"
+  | "wide"
+  | "pop"
+  | "wall-roll"
+  | "cross"
+  | "backboard"
+  | "corner"
+  | "drop"
+  | "reverse"
+  | "pinch"
+  | "ceiling"
+  | "wall-aerial"
+  | "crossbar";
+
+// Each pack has its own shot order and skill focus. Later packs deliberately
+// stop repeating the same centered setup: most of their feeds start high,
+// outside the goal mouth, or moving away from the target.
+const shotPlans: readonly (readonly ShotPattern[])[] = [
+  ["ground", "roll", "ground", "diagonal", "roll", "wide", "ground", "diagonal", "roll", "wide", "ground"],
+  ["roll", "wide", "diagonal", "pop", "ground", "wall-roll", "pop", "roll", "diagonal", "wide", "ground"],
+  ["wide", "wall-roll", "pop", "diagonal", "corner", "roll", "drop", "cross", "wall-roll", "diagonal", "cross"],
+  ["cross", "corner", "backboard", "wall-roll", "pop", "reverse", "wide", "cross", "corner", "backboard", "roll"],
+  ["reverse", "cross", "wall-aerial", "backboard", "corner", "drop", "wall-roll", "cross", "pop", "reverse", "wall-aerial"],
+  ["backboard", "wall-aerial", "ceiling", "corner", "reverse", "cross", "pinch", "crossbar", "drop", "backboard", "wall-aerial"],
+  ["wall-aerial", "backboard", "pinch", "ceiling", "corner", "reverse", "crossbar", "wall-aerial", "drop", "pinch", "backboard"],
+  ["ceiling", "pinch", "backboard", "wall-aerial", "crossbar", "reverse", "corner", "ceiling", "pinch", "drop", "wall-aerial"],
+  ["reverse", "backboard", "ceiling", "corner", "pinch", "crossbar", "wall-aerial", "reverse", "drop", "backboard", "ceiling"],
+  ["backboard", "ceiling", "wall-aerial", "pinch", "crossbar", "reverse", "corner", "backboard", "ceiling", "wall-aerial", "pinch"],
+];
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
 function makeShot(difficulty: number, index: number): TrainingShot {
-  const kind = index,
-    goalTeam = (difficulty * 3 + index * 2) % 7 === 0 ? 1 : 0,
+  const pressure = difficulty / 9,
+    pattern = shotPlans[difficulty][index],
+    goalTeam = (difficulty + index) % 2,
     goalSign = goalTeam === 0 ? -1 : 1,
-    depth = Math.max(
-      4.5,
-      11 + ((index * 7) % 20) + difficulty * 0.72 - (kind === 8 ? 10 : 0),
-    ),
-    lane = ((index * 5 + difficulty * 3) % 7) - 3,
-    edgeSign = index % 2 === 0 ? 1 : -1;
-  let ballX = lane * (1.7 + difficulty * 0.22),
+    edge = (index + difficulty) % 2 === 0 ? 1 : -1;
+  let ballX = edge * (4 + pressure * 3),
     ballY = P.ball.radius,
+    distanceToGoal = 27 - pressure * 8,
     ballVX = 0,
     ballVY = 0,
     ballVZ = 0,
-    cannon = false;
-  const ballZ = -goalSign * depth;
+    cannon = false,
+    targetX = edge * (1 + pressure * 3);
 
-  if (kind === 1) {
-    ballX += edgeSign * 3;
-    ballVX = -edgeSign * (2.2 + difficulty * 0.52);
-    ballVZ = goalSign * (1.5 + difficulty * 0.22);
-  } else if (kind === 2) {
-    ballX = edgeSign * (23 + difficulty * 0.85);
-    ballVX = -edgeSign * (2.5 + difficulty * 0.42);
-    ballVZ = goalSign * (2.2 + difficulty * 0.28);
-  } else if (kind === 3) {
-    ballY = 2.1 + difficulty * 0.24;
-    ballVY = 0.8 + difficulty * 0.16;
-    ballVZ = goalSign * (1 + difficulty * 0.24);
-  } else if (kind === 4) {
-    cannon = true;
-    ballX += edgeSign * 5;
-    ballY = 1.45 + difficulty * 0.12;
-    ballVX = edgeSign * (4.5 + difficulty * 0.62);
-    ballVY = 2.2 + difficulty * 0.38;
-    ballVZ = goalSign * (5 + difficulty * 0.65);
-  } else if (kind === 5) {
-    ballX = edgeSign * (7 + difficulty * 0.8);
-    ballVX = -edgeSign * (1 + difficulty * 0.2);
-    ballVZ = goalSign * (4 + difficulty * 0.72);
-  } else if (kind === 6) {
-    ballY = 3.3 + difficulty * 0.19;
-    ballX += edgeSign * 3.5;
-    ballVX = -edgeSign * (1.3 + difficulty * 0.38);
-    ballVY = -0.8;
-    ballVZ = goalSign * (2 + difficulty * 0.36);
-  } else if (kind === 7) {
-    cannon = true;
-    ballY = 1.5 + difficulty * 0.1;
-    ballVX = edgeSign * (2 + difficulty * 0.4);
-    ballVY = 5 + difficulty * 0.58;
-    ballVZ = goalSign * (4 + difficulty * 0.58);
-  } else if (kind === 8) {
-    ballX = edgeSign * (15 + difficulty * 0.8);
-    ballY = 2.3 + difficulty * 0.16;
-    ballVY = -0.5;
-    ballVZ = -goalSign * (3.5 + difficulty * 0.38);
-  } else if (kind === 9) {
-    cannon = true;
-    ballX += edgeSign * 6;
-    ballY = 1.2 + difficulty * 0.13;
-    ballVX = -edgeSign * (5 + difficulty * 0.58);
-    ballVY = 2 + difficulty * 0.32;
-    ballVZ = goalSign * (8 + difficulty * 0.86);
-  } else if (kind === 10) {
-    ballX = edgeSign * (21 + difficulty * 0.75);
-    ballY = 3.5 + difficulty * 0.17;
-    ballVX = -edgeSign * (3 + difficulty * 0.42);
-    ballVY = -1.2;
-    ballVZ = goalSign * (4 + difficulty * 0.48);
+  switch (pattern) {
+    case "ground":
+      ballX = ((index % 3) - 1) * (1 + pressure * 4);
+      distanceToGoal = 32 - pressure * 10;
+      break;
+    case "roll":
+      ballX = edge * (5 + pressure * 6);
+      distanceToGoal = 25 - pressure * 7;
+      ballVX = -edge * (1.5 + pressure * 2.2);
+      ballVZ = goalSign * (1 + pressure * 1.8);
+      targetX = -edge * (1 + pressure * 3);
+      break;
+    case "diagonal":
+      ballX = edge * (9 + pressure * 11);
+      distanceToGoal = 22 - pressure * 6;
+      ballVX = -edge * (2 + pressure * 2.5);
+      ballVZ = goalSign * (1.5 + pressure * 2);
+      targetX = -edge * (2 + pressure * 4);
+      break;
+    case "wide":
+      ballX = edge * (21 + pressure * 12);
+      distanceToGoal = 19 - pressure * 5;
+      ballY = P.ball.radius + pressure * 1.2;
+      ballVX = -edge * (2.5 + pressure * 2.5);
+      ballVZ = goalSign * (1.2 + pressure * 2.4);
+      targetX = -edge * (1 + pressure * 4);
+      break;
+    case "pop":
+      ballX = edge * (3 + pressure * 7);
+      distanceToGoal = 22 - pressure * 6;
+      ballY = 2.4 + pressure * 3.5;
+      ballVY = 1.8 + pressure * 2.8;
+      ballVZ = goalSign * (1 + pressure * 1.5);
+      targetX = -edge * (1 + pressure * 3);
+      break;
+    case "wall-roll":
+      ballX = edge * (P.arena.halfWidth - 2.2);
+      distanceToGoal = 15 - pressure * 3;
+      ballY = P.ball.radius + 0.25 + pressure * 0.8;
+      ballVX = -edge * (0.8 + pressure * 1.8);
+      ballVZ = goalSign * (2 + pressure * 2);
+      targetX = edge * (1 + pressure * 2);
+      break;
+    case "cross":
+      ballX = edge * (13 + pressure * 7);
+      distanceToGoal = 18 - pressure * 4;
+      ballY = 4 + pressure * 3;
+      ballVX = -edge * (3 + pressure * 2.5);
+      ballVY = 1 + pressure * 2;
+      ballVZ = goalSign * (2 + pressure * 2.5);
+      targetX = -edge * (2 + pressure * 4);
+      cannon = difficulty >= 4;
+      break;
+    case "backboard":
+      // Outside the post, already near the back wall, and moving back out.
+      // The player must intercept it and redirect across the mouth.
+      ballX = edge * (P.arena.goalHalf + 2.2 + pressure * 2.8);
+      distanceToGoal = 3.5 + pressure * 2.5;
+      ballY = 4.2 + pressure * 4.5;
+      ballVX = -edge * (2.2 + pressure * 2.8);
+      ballVY = -0.8 - pressure * 1.5;
+      ballVZ = -goalSign * (1.8 + pressure * 2.5);
+      targetX = -edge * (2 + pressure * 4);
+      cannon = difficulty >= 5;
+      break;
+    case "corner":
+      // A near-post feed starts outside the scoring frame and must be cut
+      // sharply back across the goal mouth.
+      ballX = edge * (P.arena.goalHalf + 4 + pressure * 3);
+      distanceToGoal = 4 + pressure * 3;
+      ballY = 1.5 + pressure * 2.3;
+      ballVX = -edge * (4 + pressure * 4);
+      ballVY = 0.5 + pressure * 1.5;
+      ballVZ = goalSign * (1.5 + pressure * 2.2);
+      targetX = -edge * (3 + pressure * 3);
+      cannon = difficulty >= 6;
+      break;
+    case "drop":
+      ballX = edge * (10 + pressure * 12);
+      distanceToGoal = 15 - pressure * 6;
+      ballY = 7 + pressure * 6;
+      ballVX = edge * (1 + pressure * 2);
+      ballVY = -1.2 - pressure * 1.8;
+      ballVZ = goalSign * (1.5 + pressure * 2);
+      targetX = -edge * (1 + pressure * 4);
+      cannon = difficulty >= 5;
+      break;
+    case "reverse":
+      // The ball travels away from the called goal, so a straight chase
+      // cannot score; the player has to beat it to a useful touch.
+      ballX = edge * (11 + pressure * 10);
+      distanceToGoal = 7 + pressure * 8;
+      ballY = 2.2 + pressure * 3.2;
+      ballVX = -edge * (3 + pressure * 4);
+      ballVY = -0.5 - pressure;
+      ballVZ = -goalSign * (2.2 + pressure * 3.2);
+      targetX = -edge * (2 + pressure * 4);
+      cannon = difficulty >= 6;
+      break;
+    case "pinch":
+      ballX = edge * (P.arena.halfWidth - 5.5);
+      distanceToGoal = 10 + pressure * 7;
+      ballY = 3.2 + pressure * 4.2;
+      ballVX = -edge * (5 + pressure * 3.5);
+      ballVY = 1 + pressure * 1.5;
+      ballVZ = goalSign * (4 + pressure * 2.5);
+      targetX = -edge * (3 + pressure * 3);
+      cannon = true;
+      break;
+    case "ceiling":
+      ballX = edge * (12 + pressure * 10);
+      distanceToGoal = 5 + pressure * 8;
+      ballY = 11 + pressure * 5.5;
+      ballVX = -edge * (2 + pressure * 2.5);
+      ballVY = -2.2 - pressure * 1.5;
+      ballVZ = goalSign * (2.5 + pressure * 2.5);
+      targetX = -edge * (2 + pressure * 4);
+      cannon = true;
+      break;
+    case "wall-aerial":
+      ballX = edge * (P.arena.halfWidth - 4.2);
+      distanceToGoal = 9 + pressure * 10;
+      ballY = 5 + pressure * 5.5;
+      ballVX = -edge * (4 + pressure * 3.5);
+      ballVY = 1.8 + pressure * 2.2;
+      ballVZ = goalSign * (3 + pressure * 2.5);
+      targetX = -edge * (2 + pressure * 4);
+      cannon = true;
+      break;
+    case "crossbar":
+      ballX = edge * (4 + pressure * 5);
+      distanceToGoal = 2.5 + pressure * 4.5;
+      ballY = 7.5 + pressure * 5;
+      ballVX = -edge * (2.5 + pressure * 3.5);
+      ballVY = -1.2 - pressure * 2;
+      ballVZ = goalSign * (1.5 + pressure * 3);
+      targetX = -edge * (2 + pressure * 3);
+      cannon = true;
+      break;
   }
 
-  const targetX =
-      (((index * 3 + difficulty) % 5) - 2) * (1.5 + difficulty * 0.3),
-    targetZ = goalSign * (P.arena.halfLength + 3) - ballZ,
-    aimLength = Math.hypot(targetX - ballX, targetZ) || 1,
-    dirX = (targetX - ballX) / aimLength,
-    dirZ = targetZ / aimLength,
+  const ballZ = goalSign * (P.arena.halfLength - distanceToGoal),
+    targetZ = goalSign * (P.arena.halfLength + P.arena.goalDepth * 0.65),
+    aimX = targetX - ballX,
+    aimZ = targetZ - ballZ,
+    aimLength = Math.hypot(aimX, aimZ) || 1,
+    dirX = aimX / aimLength,
+    dirZ = aimZ / aimLength,
     sideX = -dirZ,
     sideZ = dirX,
-    startDistance =
-      7.5 + difficulty * 0.55 + (kind === 6 || kind === 7 ? 1.5 : 0),
-    sideOffset = (((index + difficulty) % 3) - 1) * (0.7 + difficulty * 0.12),
-    carX = Math.max(
-      -P.arena.halfWidth + 5,
-      Math.min(
-        P.arena.halfWidth - 5,
-        ballX - dirX * startDistance + sideX * sideOffset,
-      ),
+    startDistance = 8.5 + pressure * 2.5 + (cannon ? 1.2 : 0),
+    sideOffset =
+      ((index + difficulty) % 3 - 1) * (0.8 + pressure * 3.2),
+    carX = clamp(
+      ballX - dirX * startDistance + sideX * sideOffset,
+      -P.arena.halfWidth + 3,
+      P.arena.halfWidth - 3,
     ),
-    carZ = Math.max(
-      -P.arena.halfLength + 7,
-      Math.min(
-        P.arena.halfLength - 7,
-        ballZ - dirZ * startDistance + sideZ * sideOffset,
-      ),
+    carZ = clamp(
+      ballZ - dirZ * startDistance + sideZ * sideOffset,
+      -P.arena.halfLength + 4,
+      P.arena.halfLength - 4,
     ),
-    timer = Math.round((timerBases[index] - difficulty * 0.48) * 10) / 10;
+    timer = Math.round(
+      Math.max(
+        6.2,
+        18.5 - difficulty * 0.93 - (cannon ? 1.3 : 0) + (index % 3) * 0.55,
+      ) * 10,
+    ) / 10;
 
   return {
     carX,

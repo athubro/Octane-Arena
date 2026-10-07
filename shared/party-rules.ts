@@ -49,11 +49,7 @@ export function joinPartyState(
           (team) =>
             party.members.filter((candidate) => candidate.team === team)
               .length <
-            (party.mode === "2v2bots" && team === 1
-              ? 0
-              : party.mode === "1v1"
-                ? 1
-                : 2),
+            capacity(party.mode, team),
         ) ?? null);
   member.ready = false;
   member.connected = true;
@@ -79,11 +75,7 @@ export function applyPartyLobbyAction(
       party.members.filter(
         (member) => member.id !== actorId && member.team === action.team,
       ).length >=
-        (party.mode === "2v2bots" && action.team === 1
-          ? 0
-          : party.mode === "1v1"
-            ? 1
-            : 2)
+        capacity(party.mode, action.team)
     )
       return { status: 409, error: "TEAM FULL" };
     actor.team = action.team;
@@ -128,7 +120,7 @@ export function applyPartyLobbyAction(
   }
 
   if (action.type === "mode") {
-    if (!["1v1", "2v2", "2v2bots"].includes(action.mode))
+    if (!["1v1", "2v2", "2v2bots", "heatseeker"].includes(action.mode))
       return { status: 400, error: "INVALID MODE" };
     if (party.stage === "teams")
       return { status: 409, error: "RETURN TO MODE SELECTION FIRST" };
@@ -175,5 +167,9 @@ export function applyPartyLobbyAction(
 }
 
 function capacity(mode: PartyMode, team: 0 | 1) {
-  return mode === "2v2bots" && team === 1 ? 0 : mode === "1v1" ? 1 : 2;
+  return mode === "2v2bots" && team === 1
+    ? 0
+    : mode === "1v1" || mode === "heatseeker"
+      ? 1
+      : 2;
 }
