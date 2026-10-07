@@ -10,6 +10,7 @@ export class GoalExplosion {
   private blueOut = new T.Group();
   private skull = new T.Group();
   private blueWash!: T.Mesh<T.SphereGeometry, T.MeshBasicMaterial>;
+  private blueFloor!: T.Mesh<T.PlaneGeometry, T.MeshBasicMaterial>;
   constructor(scene: T.Scene, scale = 1) {
     this.group.scale.setScalar(scale);
     this.flash = new T.Mesh(
@@ -105,6 +106,20 @@ export class GoalExplosion {
     );
     this.blueWash.renderOrder = 2;
     this.blueOut.add(this.blueWash);
+    this.blueFloor = new T.Mesh(
+      new T.PlaneGeometry(140, 140),
+      new T.MeshBasicMaterial({
+        color: 0x155cff,
+        transparent: true,
+        opacity: 0.36,
+        depthWrite: false,
+        side: T.DoubleSide,
+      }),
+    );
+    this.blueFloor.rotation.x = -Math.PI / 2;
+    this.blueFloor.position.y = -0.08;
+    this.blueFloor.renderOrder = 3;
+    this.blueOut.add(this.blueFloor);
     for (let i = 0; i < 4; i++) {
       const ring = new T.Mesh(
         new T.TorusGeometry(1, 0.045, 8, 64),
@@ -159,6 +174,7 @@ export class GoalExplosion {
       ? effect
       : "pulse";
     this.group.position.copy(position);
+    this.blueFloor.position.set(0, -position.y + 0.035, -position.z);
     this.group.visible = true;
     this.flash.visible = this.effect === "pulse";
     this.rings.forEach((ring) => (ring.visible = this.effect === "pulse"));
@@ -197,6 +213,7 @@ export class GoalExplosion {
     } else if (this.effect === "blue-out") {
       this.blueOut.scale.setScalar(0.65 + Math.min(1, t * 1.3) * 0.35);
       this.blueWash.material.opacity = 0.42 * Math.max(0, 1 - t / 2.8);
+      this.blueFloor.material.opacity = 0.36 * Math.max(0, 1 - t / 2.8);
       this.blueOut.children.slice(1).forEach((child, i) => {
         child.scale.setScalar(1 + t * (8 + i * 1.5));
         child.rotation.z += dt * (i % 2 ? -1 : 1) * 0.3;

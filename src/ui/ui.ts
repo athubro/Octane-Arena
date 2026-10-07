@@ -67,7 +67,7 @@ export class UI {
       hub.append(section);
     }
     document.getElementById("friend-mode")?.remove();
-    document.querySelector(".mode-tabs")!.hidden = true;
+    document.querySelector<HTMLElement>(".mode-tabs")!.hidden = true;
     standard.before(hub);
     standard.hidden = true;
     extra.hidden = true;
