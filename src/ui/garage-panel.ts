@@ -50,7 +50,9 @@ export class GaragePanel {
             this.render();
             this.change();
             if (this.category === "explosion")
-              this.host.dispatchEvent(new Event("preview-explosion"));
+              this.host.dispatchEvent(
+                new CustomEvent("preview-explosion", { detail: p.explosion }),
+              );
           }),
       );
       this.host.querySelectorAll<HTMLButtonElement>("[data-color]").forEach(

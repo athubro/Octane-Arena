@@ -46,12 +46,24 @@ export const inventory = {
     { id: "plasma", name: "Plasma" },
     { id: "ember", name: "Ember" },
   ],
-  topper: [{ id: "none", name: "None" }],
+  topper: [
+    { id: "none", name: "None" },
+    { id: "cat-ears", name: "Cat Ears" },
+    { id: "fox-ears", name: "Fox Ears" },
+    { id: "spike-crown", name: "Spike Crown" },
+    { id: "shark-fin", name: "Shark Fin" },
+    { id: "owl", name: "Owl" },
+  ],
   decal: [
     { id: "none", name: "None" },
     { id: "circuit", name: "Circuit" },
   ],
-  explosion: [{ id: "pulse", name: "Pulse" }],
+  explosion: [
+    { id: "pulse", name: "Pulse" },
+    { id: "forest-growth", name: "Forest Growth" },
+    { id: "blue-out", name: "Blue Out" },
+    { id: "skull", name: "Skull" },
+  ],
 } as const;
 export type CosmeticSlot = keyof typeof inventory;
 export type Team = "blue" | "orange";

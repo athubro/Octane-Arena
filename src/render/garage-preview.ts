@@ -22,6 +22,7 @@ export class GaragePreview {
   private goalExplosion = new GoalExplosion(this.goalScene, 0.25);
   private previewAge = -1;
   private exploded = false;
+  private explosionStyle = "pulse";
   get renderScene() {
     return this.category === "explosion" ? this.goalScene : this.scene;
   }
@@ -89,7 +90,9 @@ export class GaragePreview {
     host.addEventListener("lostpointercapture", end);
     window.addEventListener("blur", () => this.stopDrag());
     host.addEventListener("preview-reset", () => this.stopDrag());
-    host.addEventListener("preview-explosion", () => {
+    host.addEventListener("preview-explosion", (event) => {
+      this.explosionStyle =
+        (event as CustomEvent<string>).detail ?? "pulse";
       this.setCategory("explosion");
       this.previewAge = 0;
       this.exploded = false;
@@ -161,6 +164,7 @@ export class GaragePreview {
       p.body,
       p.wheels,
       p.decal,
+      p.topper,
     );
     this.car.position.y = 0.31;
     this.scene.add(this.car);
@@ -190,7 +194,11 @@ export class GaragePreview {
         if (!this.exploded && this.goalBall.position.z < -3.365) {
           this.exploded = true;
           this.goalBall.visible = false;
-          this.goalExplosion.trigger(this.goalBall.position, 0x69e9ff);
+          this.goalExplosion.trigger(
+            this.goalBall.position,
+            0x69e9ff,
+            this.explosionStyle,
+          );
         }
         if (this.previewAge > 4.3) this.previewAge = -1;
       }

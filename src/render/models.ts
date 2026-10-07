@@ -26,6 +26,7 @@ export function carModel(
   bodyId: BodyId = "vector",
   wheels = "apex",
   decal = "none",
+  topper = "none",
 ) {
   const g = new T.Group(),
     d = bodies[bodyId],
@@ -199,6 +200,59 @@ export function carModel(
         stripe,
       );
     }
+  if (topper !== "none") {
+    const cap = new T.Group();
+    cap.position.set(0, roof + 0.035, roofZ);
+    const topperMaterial = (color: number) =>
+      new T.MeshStandardMaterial({ color, metalness: 0.25, roughness: 0.48 });
+    const addMesh = (geometry: T.BufferGeometry, mat: T.Material, x: number, y: number, z: number) => {
+      const mesh = new T.Mesh(geometry, mat);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      cap.add(mesh);
+      return mesh;
+    };
+    if (topper === "cat-ears" || topper === "fox-ears") {
+      const fox = topper === "fox-ears",
+        fur = topperMaterial(fox ? 0xd46c3d : 0x263d4b),
+        inner = topperMaterial(fox ? 0xffc18a : 0xf28db2);
+      for (const side of [-1, 1]) {
+        const ear = addMesh(new T.ConeGeometry(0.105, 0.28, 4), fur, side * 0.2, 0.13, 0);
+        ear.rotation.z = -side * 0.2;
+        if (!fox)
+          addMesh(new T.ConeGeometry(0.052, 0.15, 4), inner, side * 0.2, 0.145, -0.004);
+      }
+    } else if (topper === "spike-crown") {
+      const steel = topperMaterial(0xd9e6e9);
+      for (let i = 0; i < 5; i++) {
+        const x = (i - 2) * 0.105,
+          spike = addMesh(new T.ConeGeometry(0.065, 0.24, 5), steel, x, 0.11, 0);
+        spike.rotation.z = -x * 0.65;
+      }
+    } else if (topper === "shark-fin") {
+      const fin = addMesh(
+        new T.ConeGeometry(0.19, 0.38, 3),
+        topperMaterial(0x4f91a4),
+        0,
+        0.16,
+        0,
+      );
+      fin.rotation.x = -Math.PI / 2;
+      fin.rotation.z = Math.PI;
+    } else if (topper === "owl") {
+      const body = topperMaterial(0x916c46),
+        eye = new T.MeshBasicMaterial({ color: 0xffe8a3 }),
+        pupil = new T.MeshBasicMaterial({ color: 0x18232b });
+      addMesh(new T.SphereGeometry(0.16, 12, 10), body, 0, 0.1, 0);
+      for (const side of [-1, 1]) {
+        addMesh(new T.SphereGeometry(0.055, 10, 8), eye, side * 0.065, 0.14, -0.13);
+        addMesh(new T.SphereGeometry(0.022, 8, 6), pupil, side * 0.065, 0.14, -0.17);
+        const tuft = addMesh(new T.ConeGeometry(0.06, 0.12, 4), body, side * 0.1, 0.25, 0.02);
+        tuft.rotation.z = -side * 0.4;
+      }
+    }
+    g.add(cap);
+  }
   const spins: T.Group[] = [],
     mounts: T.Group[] = [],
     steering: T.Group[] = [];

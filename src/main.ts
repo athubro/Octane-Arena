@@ -123,6 +123,7 @@ async function boot() {
       garage.current.body,
       garage.current.wheels,
       garage.current.decal,
+      garage.current.topper,
     ),
     carModel(0xfa9c3e, "vector"),
     carModel(0x69e9ff),
@@ -196,6 +197,7 @@ async function boot() {
       preset.body,
       preset.wheels,
       preset.decal,
+      preset.topper,
     );
     cars[i].add(visuals[i]);
     simulation.cars[i].setBody(preset.body);
@@ -214,6 +216,7 @@ async function boot() {
       p.body,
       p.wheels,
       p.decal,
+      p.topper,
     );
     cars[0].add(visuals[0]);
     simulation.cars[0].setBody(p.body);
@@ -756,7 +759,7 @@ async function boot() {
         goalReplayPending = true;
         const origin = new T.Vector3().copy(simulation.ball.translation()),
           color = origin.z < 0 ? 0x69e9ff : 0xffb654;
-        explosion.trigger(origin, color);
+        explosion.trigger(origin, color, garage.current.explosion);
         effects.burst(origin, color);
         vehicleEffects.forEach((e) => e.reset());
       }
@@ -977,7 +980,7 @@ async function boot() {
               : origin.z < 0
                 ? 0x69e9ff
                 : 0xffb654;
-          explosion.trigger(origin, color);
+          explosion.trigger(origin, color, garage.current.explosion);
           effects.burst(origin, color);
           vehicleEffects.forEach((e) => e.reset());
         }
