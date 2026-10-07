@@ -244,6 +244,68 @@ check("high-speed side-wall impact keeps cars inside the arena", () => {
   s.dispose();
   return { x };
 });
+check("nose-first side-wall drive cannot pass through the arena shell", () => {
+  const s = fixture(),
+    c = s.cars[0];
+  orient(
+    s,
+    new Vector3(P.arena.halfWidth - 2.5, 0.36, 0),
+    new Vector3(0, 1, 0),
+    new Vector3(1, 0, 0),
+  );
+  c.body.setLinvel({ x: 18, y: 0, z: 0 }, true);
+  for (let i = 0; i < 900; i++) {
+    step(s, { throttle: 1 });
+    const position = new Vector3().copy(c.body.translation()),
+      rotation = new Quaternion().copy(c.body.rotation()),
+      dimensions = bodies[c.bodyId];
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity,
+      minZ = Infinity,
+      maxZ = -Infinity;
+    for (const x of [-dimensions.halfWidth, dimensions.halfWidth])
+      for (const y of [
+        dimensions.hitboxY - dimensions.halfHeight,
+        dimensions.hitboxY + dimensions.halfHeight,
+      ])
+        for (const z of [-dimensions.halfLength, dimensions.halfLength]) {
+          const corner = new Vector3(x, y, z)
+            .applyQuaternion(rotation)
+            .add(position);
+          minX = Math.min(minX, corner.x);
+          maxX = Math.max(maxX, corner.x);
+          minY = Math.min(minY, corner.y);
+          maxY = Math.max(maxY, corner.y);
+          minZ = Math.min(minZ, corner.z);
+          maxZ = Math.max(maxZ, corner.z);
+        }
+    assert.ok(
+      minX >= -P.arena.halfWidth - 0.08 &&
+        maxX <= P.arena.halfWidth + 0.08 &&
+        minY >= -0.08 &&
+        maxY <= P.arena.height + 0.08 &&
+        minZ >= -P.arena.halfLength - 0.08 &&
+        maxZ <= P.arena.halfLength + 0.08,
+      `chassis escaped at x=[${minX},${maxX}] y=[${minY},${maxY}] z=[${minZ},${maxZ}] center=${position.toArray()}`,
+    );
+  }
+  const x = c.body.translation().x;
+  s.dispose();
+  return { x };
+});
+check("cars already above the ceiling are returned into the arena", () => {
+  const s = fixture(),
+    c = s.cars[0];
+  c.body.setTranslation({ x: 0, y: P.arena.height + 2, z: 0 }, true);
+  s.step([neutral(), neutral()]);
+  const y = c.body.translation().y;
+  assert.ok(y <= P.arena.height, `car remained above ceiling at y=${y}`);
+  assert.ok(y > 0, `car was not recovered into the playable volume: y=${y}`);
+  s.dispose();
+  return { y };
+});
 check("cars already outside a side wall are returned inside the arena", () => {
   const s = fixture(),
     c = s.cars[0];

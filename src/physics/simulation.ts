@@ -49,11 +49,37 @@ function carInsideArenaEnvelope(x: number, z: number) {
   // recovery point from the visible wall. Keep one shared contact tolerance.
   return insideRoundedArena(x, z, -0.02);
 }
-function carInsideArenaBounds(x: number, y: number, z: number) {
+function carInsideArenaBounds(
+  x: number,
+  y: number,
+  z: number,
+  tolerance = 0.02,
+) {
   return (
-    y >= -2.5 &&
-    (carInsideArenaEnvelope(x, z) || insideGoalTunnel(x, y, z, -0.02))
+    y >= -tolerance &&
+    y <= P.arena.height + tolerance &&
+    (insideRoundedArena(x, z, -tolerance) ||
+      insideGoalTunnel(x, y, z, -tolerance))
   );
+}
+function carFootprintInsideArena(car: Car) {
+  const position = new Vector3().copy(car.body.translation()),
+    rotation = new Quaternion().copy(car.body.rotation()),
+    dimensions = bodies[car.bodyId];
+  if (!carInsideArenaBounds(position.x, position.y, position.z)) return false;
+  for (const x of [-dimensions.halfWidth, dimensions.halfWidth])
+    for (const y of [
+      dimensions.hitboxY - dimensions.halfHeight,
+      dimensions.hitboxY + dimensions.halfHeight,
+    ])
+      for (const z of [-dimensions.halfLength, dimensions.halfLength]) {
+        const corner = new Vector3(x, y, z)
+          .applyQuaternion(rotation)
+          .add(position);
+        if (!carInsideArenaBounds(corner.x, corner.y, corner.z, 0.06))
+          return false;
+      }
+  return true;
 }
 export class Simulation {
   world: RAPIER.World;
@@ -389,8 +415,7 @@ export class Simulation {
         c.body.isEnabled()
       ) {
         const position = c.body.translation();
-        if (carInsideArenaBounds(position.x, position.y, position.z))
-          this.rememberSafeCarTransform(c);
+        if (carFootprintInsideArena(c)) this.rememberSafeCarTransform(c);
       }
       c.pose.before();
       if (!passive && c.body.isEnabled())
@@ -523,7 +548,7 @@ export class Simulation {
     for (const car of this.cars) {
       if (!car.active || !car.body.isEnabled()) continue;
       const p = car.body.translation();
-      if (carInsideArenaBounds(p.x, p.y, p.z)) {
+      if (carFootprintInsideArena(car)) {
         this.rememberSafeCarTransform(car);
         continue;
       }
@@ -565,7 +590,14 @@ export class Simulation {
         x *= 0.94;
         z *= 0.94;
       }
-      const y = p.y < -2.5 ? Math.max(0.36, dimensions.hitboxY + dimensions.halfHeight) : p.y,
+        const outsideVerticalBounds =
+            p.y < -0.06 || p.y > P.arena.height + 0.06,
+          y =
+            p.y < -0.06
+              ? Math.max(0.36, dimensions.hitboxY + dimensions.halfHeight)
+              : p.y > P.arena.height + 0.06
+                ? P.arena.height - dimensions.hitboxY - dimensions.halfHeight - 0.08
+                : p.y,
         outward = new Vector3(p.x - x, p.y - y, p.z - z);
       if (outward.lengthSq() > 1e-8) {
         outward.normalize();
@@ -573,7 +605,10 @@ export class Simulation {
         if (outwardSpeed > 0)
           velocity.addScaledVector(outward, -outwardSpeed);
       }
-      if (p.y < -2.5 && velocity.y < 0) velocity.y = 0;
+      if (outsideVerticalBounds) {
+        velocity.y = 0;
+        car.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+      }
       car.body.setTranslation({ x, y, z }, true);
       car.body.setLinvel(velocity, true);
       car.pose.snap();
