@@ -1628,6 +1628,13 @@ output {
   line-height:1.4;
   letter-spacing:.045em;
 }
+.pack-controls-note {
+  margin-top: 6px;
+  color: #93d8e6;
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: .04em;
+}
 .lumen-field {
   background-image: linear-gradient(0deg,#07131be8,#10233522 75%), radial-gradient(ellipse at 55% 95%,#d8b178 0,transparent 42%), linear-gradient(145deg,#6a8292,#243948 55%,#0f202d);
 }

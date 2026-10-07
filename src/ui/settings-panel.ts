@@ -169,7 +169,7 @@ export class SettingsPanel {
       const controllerAvailable = Array.from(
         navigator.getGamepads?.() ?? [],
       ).some((pad) => pad?.connected);
-      host.innerHTML = `<div class="controller-setting"><div><strong>CONTROLLER MODE</strong><p class="field-note">${controllerAvailable ? "Gamepad connected — standard controls supported." : "Connect a gamepad to use controller mode."}</p></div><button id="controller-mode" class="small-button" aria-pressed="${this.input.controllerMode}">${this.input.controllerMode ? "ON" : "OFF"}</button></div><div class="binding-list">${(
+      host.innerHTML = `<div class="controller-setting"><div><strong>CONTROLLER MODE</strong><p class="field-note">${controllerAvailable ? "Gamepad connected — RT/LT drive, left stick steers and air-pitches, A jump, B boost, X powerslide, Y ball cam, LB/RB air-roll, Start pause." : "Connect a gamepad to use controller mode. Standard controls: RT/LT drive, left stick steer/air-pitch, A jump, B boost, X powerslide, Y ball cam, LB/RB air-roll, Start pause."}</p></div><button id="controller-mode" class="small-button" aria-pressed="${this.input.controllerMode}">${this.input.controllerMode ? "ON" : "OFF"}</button></div><div class="binding-list">${(
         Object.keys(defaultBindings) as Action[]
       )
         .filter((k) => k !== "reset")
