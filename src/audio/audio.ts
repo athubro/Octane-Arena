@@ -116,6 +116,7 @@ export class GameAudio {
     throttle = 0,
     menu = false,
     slip = 0,
+    inMatch = false,
   ) {
     const c = this.ctx;
     if (!c || !this.engine || !this.engineGain || !this.boostGain) return;
@@ -139,16 +140,27 @@ export class GameAudio {
       c.currentTime,
       0.025,
     );
-    if (menu && this.settings.music > 0 && c.currentTime >= this.nextMusic) {
-      const notes = [110, 164.81, 220, 196, 130.81, 196, 261.63, 164.81];
-      this.tone(
-        notes[this.musicStep++ % notes.length],
-        1.6,
-        0.018,
-        "sine",
-        "music",
-      );
-      this.nextMusic = c.currentTime + 0.48;
+    if (
+      this.settings.music > 0 &&
+      (menu || inMatch) &&
+      c.currentTime >= this.nextMusic
+    ) {
+      const step = this.musicStep++ % 16;
+      if (inMatch) {
+        const melody = [196, 246.94, 293.66, 246.94, 220, 261.63, 329.63, 293.66];
+        const bass = [98, 110, 82.41, 123.47];
+        this.tone(melody[step % melody.length], 0.34, 0.022, "triangle", "music");
+        this.tone(melody[(step + 2) % melody.length] / 2, 0.72, 0.008, "sine", "music");
+        if (step % 4 === 0)
+          this.tone(bass[(step / 4) % bass.length], 0.46, 0.026, "sine", "music");
+        if (step % 2 === 1)
+          this.tone(587.33 + (step % 4) * 73.42, 0.09, 0.004, "sine", "music");
+        this.nextMusic = c.currentTime + 0.32;
+      } else {
+        const notes = [110, 164.81, 220, 196, 130.81, 196, 261.63, 164.81];
+        this.tone(notes[step % notes.length], 1.6, 0.018, "sine", "music");
+        this.nextMusic = c.currentTime + 0.48;
+      }
     }
   }
 }

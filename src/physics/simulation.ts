@@ -179,8 +179,7 @@ export class Simulation {
     this.ringSpawn = spawn;
     for (const collider of this.arenaColliders)
       collider.setCollisionGroups(enabled ? 0 : 0xffffffff);
-    for (const collider of this.ringPlatform)
-      collider.setCollisionGroups(enabled ? 0xffffffff : 0);
+    for (const collider of this.ringPlatform) collider.setCollisionGroups(0);
   }
   setHeatseeker(enabled: boolean) {
     this.heatseekerEnabled = enabled;
@@ -511,8 +510,7 @@ export class Simulation {
       c.pose.after();
     });
     this.ballPose.after();
-    if (this.ringCourseEnabled) this.recoverRingEscape();
-    else if (!this.flatArena) this.recoverEscapedBodies();
+    if (!this.ringCourseEnabled && !this.flatArena) this.recoverEscapedBodies();
   }
   private recoverRingEscape() {
     for (const car of this.cars) {

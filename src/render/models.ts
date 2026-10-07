@@ -273,19 +273,113 @@ export function carModel(
     tyre.rotation.z = Math.PI / 2;
     tyre.castShadow = true;
     spin.add(tyre);
-    const hub = new T.Mesh(
+    const hubColor = wheels === "smiley" || wheels === "laugh"
+        ? wheels === "laugh" ? 0xffae34 : 0xffd43b
+        : wheels === "coin"
+          ? 0xd89b37
+          : wheels === "prism"
+            ? 0x6edfea
+            : wheels === "star"
+              ? 0xb9e5ff
+              : wheels === "turbine"
+                ? 0x7f9da8
+                : 0xa6cad3,
+      hub = new T.Mesh(
       new T.CylinderGeometry(
-        wheels === "disc" ? 0.14 : 0.115,
-        wheels === "disc" ? 0.14 : 0.115,
+        wheels === "disc" || wheels === "coin" ? 0.14 : 0.115,
+        wheels === "disc" || wheels === "coin" ? 0.14 : 0.115,
         0.12,
-        wheels === "disc" ? 24 : 6,
+        wheels === "disc" || wheels === "coin" ? 24 : 6,
       ),
-      material(0xa6cad3, 0.9, 0.25),
+      material(hubColor, 0.9, 0.25),
     );
     hub.rotation.z = Math.PI / 2;
     spin.add(hub);
     const spoke = box(spin, [0.125, 0.025, 0.26], [0, 0, 0], paint);
     if (wheels === "disc") spoke.rotation.x = Math.PI / 4;
+    if (["smiley", "laugh", "coin", "turbine", "star", "prism", "retro"].includes(wheels)) {
+      const face = new T.Group();
+      for (const side of [-1, 1]) {
+        const detail = new T.Group();
+        detail.position.x = side * 0.065;
+        detail.scale.x = side;
+        face.add(detail);
+        const ink = new T.MeshBasicMaterial({
+          color: wheels === "smiley" || wheels === "laugh" ? 0x202934 : 0xeffbff,
+        });
+        const addDot = (y: number, z: number, radius: number) => {
+          const dot = new T.Mesh(new T.SphereGeometry(radius, 8, 6), ink);
+          dot.position.set(0, y, z);
+          detail.add(dot);
+        };
+        const addLine = (points: T.Vector3[], radius = 0.012) => {
+          const line = new T.Mesh(
+            new T.TubeGeometry(new T.CatmullRomCurve3(points), 18, radius, 5, false),
+            ink,
+          );
+          detail.add(line);
+        };
+        if (wheels === "smiley" || wheels === "laugh") {
+          addDot(0.045, -0.045, 0.018);
+          addDot(0.045, 0.045, 0.018);
+          if (wheels === "smiley")
+            addLine([
+              new T.Vector3(0, -0.05, -0.065),
+              new T.Vector3(0, -0.085, 0),
+              new T.Vector3(0, -0.05, 0.065),
+            ], 0.012);
+          else {
+            addLine([
+              new T.Vector3(0, -0.025, -0.07),
+              new T.Vector3(0, -0.09, -0.04),
+              new T.Vector3(0, -0.095, 0.04),
+              new T.Vector3(0, -0.025, 0.07),
+            ], 0.018);
+            for (let tooth = -1; tooth <= 1; tooth++)
+              addLine([
+                new T.Vector3(0, -0.055, tooth * 0.035),
+                new T.Vector3(0, -0.085, tooth * 0.035),
+              ], 0.006);
+          }
+        } else if (wheels === "coin") {
+          const coinMark = new T.Mesh(
+            new T.TorusGeometry(0.075, 0.009, 5, 20),
+            new T.MeshBasicMaterial({ color: 0xffe69b }),
+          );
+          coinMark.position.x = 0;
+          coinMark.rotation.y = Math.PI / 2;
+          detail.add(coinMark);
+          addLine([
+            new T.Vector3(0, -0.055, 0),
+            new T.Vector3(0, 0.055, 0),
+          ], 0.017);
+        } else if (wheels === "star") {
+          for (let ray = 0; ray < 8; ray++) {
+            const angle = (ray * Math.PI) / 4;
+            addLine([
+              new T.Vector3(0, 0, 0),
+              new T.Vector3(0, Math.cos(angle) * 0.09, Math.sin(angle) * 0.09),
+            ], ray % 2 ? 0.008 : 0.015);
+          }
+        } else {
+          const count = wheels === "retro" ? 5 : wheels === "turbine" ? 7 : 6;
+          for (let spokeIndex = 0; spokeIndex < count; spokeIndex++) {
+            const angle = (spokeIndex * Math.PI * 2) / count,
+              inner = wheels === "turbine" ? 0.025 : 0.035,
+              outer = wheels === "turbine" ? 0.105 : 0.095;
+            addLine([
+              new T.Vector3(0, Math.cos(angle) * inner, Math.sin(angle) * inner),
+              new T.Vector3(
+                0,
+                Math.cos(angle + (wheels === "turbine" ? 0.2 : 0)) * outer,
+                Math.sin(angle + (wheels === "turbine" ? 0.2 : 0)) * outer,
+              ),
+            ], wheels === "retro" ? 0.016 : 0.01);
+          }
+        }
+      }
+      spin.add(face);
+    }
     spins.push(spin);
     if (i < 2) steering.push(pivot);
   }

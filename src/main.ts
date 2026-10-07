@@ -201,7 +201,10 @@ async function boot() {
     );
     cars[i].add(visuals[i]);
     simulation.cars[i].setBody(preset.body);
-    vehicleEffects[i].setColor(preset.boost === "ember" ? 0xffa548 : 0x69e9ff);
+    vehicleEffects[i].setColor(
+      preset.boost === "ember" ? 0xffa548 : 0x69e9ff,
+      preset.boost,
+    );
   };
   const explosion = new GoalExplosion(scene);
   const graphics = new Graphics(renderer, scene, camera, sun),
@@ -221,7 +224,10 @@ async function boot() {
     cars[0].add(visuals[0]);
     simulation.cars[0].setBody(p.body);
     simulation.cars[1].setBody("vector");
-    vehicleEffects[0].setColor(p.boost === "ember" ? 0xffa548 : 0x69e9ff);
+    vehicleEffects[0].setColor(
+      p.boost === "ember" ? 0xffa548 : 0x69e9ff,
+      p.boost,
+    );
     preview.setPreset(p, garagePanel.team);
   };
   const garagePanel = new GaragePanel(garage, updatePreset, () => {
@@ -854,10 +860,7 @@ async function boot() {
             );
             if (result === "passed") {
               ringCourse.syncActiveGate();
-              const previousIndex =
-                (ringChallenge.ringIndex + ringChallenge.count - 1) %
-                ringChallenge.count;
-              effects.burst(ringChallenge.centers[previousIndex], 0xffd777);
+              effects.burst(ringChallenge.lastPassedCenter, 0xffd777);
               audio.tone(
                 540 + Math.min(500, ringChallenge.streak * 35),
                 0.14,
@@ -1247,7 +1250,7 @@ async function boot() {
     ui.updateRingChallenge(
       ringChallenge.streak,
       ringChallenge.best,
-      ringChallenge.ringIndex + 1,
+      ringChallenge.streak + 1,
       ringChallenge.count,
     );
     const again = document.getElementById("again") as HTMLButtonElement;
@@ -1268,6 +1271,9 @@ async function boot() {
       controls.throttle,
       match.phase === "home",
       simulation.cars[0].skidIntensity,
+      match.phase === "countdown" ||
+        match.phase === "playing" ||
+        match.phase === "goal",
     );
     requestAnimationFrame(frame);
   }

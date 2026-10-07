@@ -170,6 +170,7 @@ export class GaragePreview {
     this.scene.add(this.car);
     this.color = p.boost === "ember" ? 0xffa548 : 0x69e9ff;
     this.boostEffects = new VehicleEffects(this.car, this.scene, this.color);
+    this.boostEffects.setColor(this.color, p.boost);
   }
   update(width: number, height: number, dt = 1 / 60, category = "body") {
     this.setCategory(category);

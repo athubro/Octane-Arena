@@ -41,10 +41,22 @@ export const inventory = {
   wheels: [
     { id: "apex", name: "Apex" },
     { id: "disc", name: "Orbit" },
+    { id: "smiley", name: "Smiley" },
+    { id: "laugh", name: "Laugh Track" },
+    { id: "coin", name: "Lucky Coin" },
+    { id: "turbine", name: "Turbine" },
+    { id: "star", name: "Starburst" },
+    { id: "prism", name: "Prism" },
+    { id: "retro", name: "Retro Five" },
   ],
   boost: [
     { id: "plasma", name: "Plasma" },
     { id: "ember", name: "Ember" },
+    { id: "money", name: "Money Rain" },
+    { id: "confetti", name: "Confetti" },
+    { id: "comet", name: "Comet Tail" },
+    { id: "rainbow", name: "Rainbow Rush" },
+    { id: "mint", name: "Mint Circuit" },
   ],
   topper: [
     { id: "none", name: "None" },

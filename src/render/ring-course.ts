@@ -20,13 +20,50 @@ export class RingCourseView {
     metalness: 0.28,
     roughness: 0.32,
   });
-  private orientation = new T.Quaternion();
-
   constructor(
-    scene: T.Scene,
+    private scene: T.Scene,
     private challenge: RingChallenge,
   ) {
-    challenge.centers.forEach((center, i) => {
+    this.syncActiveGate();
+    this.setVisible(false);
+  }
+
+  setVisible(visible: boolean) {
+    for (const gate of this.gates) gate.visible = visible;
+    for (const decoration of this.decorations) decoration.visible = visible;
+  }
+
+  syncActiveGate() {
+    for (const gate of this.gates) {
+      gate.parent?.remove(gate);
+      gate.traverse((node) => {
+        if (node instanceof T.Mesh) {
+          node.geometry.dispose();
+          if (Array.isArray(node.material))
+            node.material.forEach((material) => material.dispose());
+          else node.material.dispose();
+        }
+      });
+    }
+    for (const decoration of this.decorations) {
+      decoration.parent?.remove(decoration);
+      if (decoration instanceof T.Sprite) {
+        decoration.material.map?.dispose();
+        decoration.material.dispose();
+      }
+      if (decoration instanceof T.Mesh) {
+        decoration.geometry.dispose();
+        if (Array.isArray(decoration.material))
+          decoration.material.forEach((material) => material.dispose());
+        else decoration.material.dispose();
+      }
+    }
+    this.gates = [];
+    this.rings = [];
+    this.labels = [];
+    this.decorations = [];
+    const normalAxis = new T.Vector3(0, 0, 1);
+    this.challenge.centers.forEach((center, i) => {
       const gate = new T.Group(),
         halo = new T.Mesh(
           new T.TorusGeometry(3.24, 0.2, 8, 56),
@@ -43,20 +80,18 @@ export class RingCourseView {
         );
       gate.position.copy(center);
       const previous =
-        challenge.centers[
-          (i + challenge.centers.length - 1) % challenge.centers.length
-        ];
+        i === 0 ? this.challenge.lastPassedCenter : this.challenge.centers[i - 1];
       gate.quaternion.setFromUnitVectors(
-        new T.Vector3(0, 0, 1),
+        normalAxis,
         new T.Vector3().subVectors(center, previous).normalize(),
       );
       halo.scale.setScalar(1.08);
       gate.add(halo, ring);
-      scene.add(gate);
+      this.scene.add(gate);
       this.gates.push(gate);
       this.rings.push(ring);
       const labelMaterial = new T.SpriteMaterial({
-        map: this.createLabel(i + 1),
+        map: this.createLabel(this.challenge.streak + i + 1),
         transparent: true,
         depthWrite: false,
         toneMapped: false,
@@ -65,32 +100,19 @@ export class RingCourseView {
       const label = new T.Sprite(labelMaterial);
       label.position.copy(center).add(new T.Vector3(4.1, 3.8, 0));
       label.scale.set(2.3, 1.15, 1);
-      scene.add(label);
+      this.scene.add(label);
       this.labels.push(label);
       this.decorations.push(label);
-      if (i < challenge.centers.length - 1)
-        this.addGuide(scene, center, challenge.centers[i + 1]);
+      if (i < this.challenge.centers.length - 1)
+        this.addGuide(this.scene, center, this.challenge.centers[i + 1]);
     });
-    this.syncActiveGate();
-    this.setVisible(false);
-  }
-
-  setVisible(visible: boolean) {
-    for (const gate of this.gates) gate.visible = visible;
-    for (const decoration of this.decorations) decoration.visible = visible;
-  }
-
-  syncActiveGate() {
-    const normalAxis = new T.Vector3(0, 0, 1);
-    this.orientation.setFromUnitVectors(normalAxis, this.challenge.direction);
-    this.gates[this.challenge.ringIndex].quaternion.copy(this.orientation);
     this.rings.forEach((ring, i) => {
       ring.material =
-        i === this.challenge.ringIndex
+        i === 0
           ? this.activeMaterial
           : this.inactiveMaterial;
       this.labels[i].material.color.set(
-        i === this.challenge.ringIndex ? 0xffd777 : 0xdaf8ff,
+        i === 0 ? 0xffd777 : 0xdaf8ff,
       );
     });
   }

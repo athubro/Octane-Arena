@@ -14,6 +14,8 @@ export class VehicleEffects {
   private sampleTime = 0;
   private fade = 0;
   private wasActive = false;
+  private boostStyle = "plasma";
+  private moneyCoins: T.Mesh[] = [];
   constructor(
     private model: T.Group,
     scene: T.Scene,
@@ -50,6 +52,22 @@ export class VehicleEffects {
     this.glow = new T.PointLight(color, 0, 4, 2);
     this.glow.position.set(0, 0, 1);
     this.flames.add(this.glow);
+    for (let i = 0; i < 5; i++) {
+      const coin = new T.Mesh(
+        new T.CylinderGeometry(0.075, 0.075, 0.025, 16),
+        new T.MeshStandardMaterial({
+          color: 0xffca48,
+          metalness: 0.8,
+          roughness: 0.28,
+          emissive: 0x603800,
+        }),
+      );
+      coin.rotation.z = Math.PI / 2;
+      coin.position.set((i % 2 ? 1 : -1) * 0.24, (i - 2) * 0.11, 1.2 + i * 0.28);
+      coin.userData.phase = i * 1.7;
+      this.flames.add(coin);
+      this.moneyCoins.push(coin);
+    }
     model.add(this.flames);
     for (let wheel = 0; wheel < 2; wheel++) {
       const positions = new Float32Array(48 * 6 * 3),
@@ -80,13 +98,31 @@ export class VehicleEffects {
     }
     this.flames.visible = false;
   }
-  setColor(color: number) {
-    this.glow.color.setHex(color);
-    for (const t of this.trails) t.mesh.material.color.setHex(color);
+  setColor(color: number, style = "plasma") {
+    this.boostStyle = style;
+    const colors =
+      style === "money"
+        ? [0x48d88a, 0xffce4d, 0x9effb9, 0xffe89a]
+        : style === "confetti"
+          ? [0xff4f87, 0xffcf43, 0x49d6ff, 0xb87bff]
+          : style === "comet"
+            ? [0x50e8ff, 0xd3fbff, 0x62aaff, 0xf5ffff]
+            : style === "rainbow"
+              ? [0xff5d62, 0xffca45, 0x62ed9c, 0x78a8ff]
+              : style === "mint"
+                ? [0x42e5bd, 0xb6fff0, 0x36a98e, 0xeffffb]
+                : style === "ember"
+                  ? [0xff7b36, 0xffd17a, 0xff4936, 0xffe7b5]
+                  : [color, 0xeaffff, color, 0xd7faff];
+    this.glow.color.setHex(colors[0]);
+    for (const [i, trail] of this.trails.entries())
+      trail.mesh.material.color.setHex(colors[i ? 2 : 0]);
     this.flames.children.forEach((child, i) => {
-      if (child instanceof T.Mesh && i % 2 === 0)
-        child.material.color.setHex(color);
+      if (!(child instanceof T.Mesh)) return;
+      if (i < 4) child.material.color.setHex(colors[i]);
+      if (this.moneyCoins.includes(child)) child.visible = false;
     });
+    this.moneyCoins.forEach((coin) => (coin.visible = style === "money"));
   }
   previewBoost(time: number, enabled: boolean) {
     this.flames.visible = enabled;
@@ -94,6 +130,7 @@ export class VehicleEffects {
       1 + 0.17 * Math.sin(time * 67) + 0.1 * Math.sin(time * 113);
     this.flames.position.z = 0.65 * (1 - this.flames.scale.z);
     this.glow.intensity = enabled ? 2.4 : 0;
+    this.animateCoins(time, enabled);
   }
   dispose() {
     for (const t of this.trails) {
@@ -110,6 +147,7 @@ export class VehicleEffects {
       1 + 0.17 * Math.sin(time * 67) + 0.1 * Math.sin(time * 113);
     this.flames.position.z = 0.65 * (1 - this.flames.scale.z);
     this.glow.intensity = car.boosting ? 2.4 : 0;
+    this.animateCoins(time, active && car.boosting);
     const sonic = active && car.wheelContact.some(Boolean) && car.supersonic;
     if (!car.wheelContact.some(Boolean)) {
       this.fade = 0;
@@ -160,5 +198,14 @@ export class VehicleEffects {
       t.mesh.geometry.setDrawRange(0, k / 3);
       t.mesh.geometry.attributes.position.needsUpdate = true;
     }
+  }
+  private animateCoins(time: number, enabled: boolean) {
+    this.moneyCoins.forEach((coin) => {
+      coin.visible = enabled && this.boostStyle === "money";
+      coin.rotation.y = time * 5 + coin.userData.phase;
+      coin.position.y =
+        Math.sin(time * 8 + coin.userData.phase) * 0.09 +
+        (Number(coin.userData.phase) - 3.4) * 0.055;
+    });
   }
 }

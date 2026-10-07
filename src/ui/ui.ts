@@ -291,7 +291,7 @@ export class UI {
     document.getElementById("ring-streak")!.textContent = String(streak);
     document.getElementById("ring-best")!.textContent = `BEST ${best}`;
     document.getElementById("ring-next")!.textContent =
-      `NEXT RING ${String(ring).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
+      `NEXT RING ${String(ring).padStart(2, "0")} · INFINITE COURSE`;
     document.querySelector("#rings-mode small")!.textContent =
       `FLY NUMBERED RINGS IN ORDER · BEST ${best}`;
   }
