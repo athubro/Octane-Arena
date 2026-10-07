@@ -45,6 +45,7 @@ import { BallTrails, FlipTrails } from "./effects/motion-trails";
 import { PadRecharge } from "./render/pad-recharge";
 import { DemolitionFlash } from "./effects/demolition-flash";
 import { RingChallenge } from "./game/ring-challenge";
+import { DribblingChallenge } from "./game/dribbling";
 import { RingCourseView } from "./render/ring-course";
 import { RingMap } from "./render/ring-map";
 import { TrainingPackRun } from "./game/training-packs";
@@ -74,6 +75,7 @@ async function boot() {
     match = new Match(),
     goalReplay = new GoalReplay(),
     ringChallenge = new RingChallenge(),
+    dribblingChallenge = new DribblingChallenge(),
     trainingPackRun = new TrainingPackRun(),
     pads = new Pads(),
     audio = new GameAudio();
@@ -327,9 +329,14 @@ async function boot() {
     goalReplayPending = false;
     ui.modes(false);
     arena.setField(selectedField);
-    simulation.setRingCourse(mode === "rings", RingChallenge.startingPosition);
-    arena.setVisible(mode !== "rings");
-    ringMap.setVisible(mode === "rings");
+    const ringLikeMode =
+      mode === "rings" ||
+      mode === "dribbling-race" ||
+      mode === "solo-dribbling" ||
+      mode === "bot-ranked";
+    simulation.setRingCourse(ringLikeMode, RingChallenge.startingPosition);
+    arena.setVisible(!ringLikeMode);
+    ringMap.setVisible(ringLikeMode);
     resetEffects();
     audio.unlock();
     input.clear();
@@ -342,6 +349,14 @@ async function boot() {
     ui.rankedResult = "";
     rankedSettled = false;
     ringChallenge.start();
+    if (
+      mode === "dribbling-race" ||
+      mode === "solo-dribbling" ||
+      mode === "bot-ranked"
+    ) {
+      dribblingChallenge.start(0);
+      match.score = [1, dribblingChallenge.best];
+    }
     ringCourse.syncActiveGate();
     opponent.setHeatseekerMode(mode === "heatseeker");
     opponent.reset();
@@ -624,8 +639,13 @@ async function boot() {
   ui.on("pause-settings", openSettings);
   ui.on("pause-controls", () => settingsPanel.open("controls"));
   ui.on("pause-reset", () => {
-    if (match.mode === "rings") {
-      start("rings");
+    if (
+      match.mode === "rings" ||
+      match.mode === "dribbling-race" ||
+      match.mode === "solo-dribbling" ||
+      match.mode === "bot-ranked"
+    ) {
+      start(match.mode);
     } else if (trainingPackRun.active) {
       trainingPackRun.restart(match, simulation);
       resetEffects();
@@ -903,6 +923,37 @@ async function boot() {
               match.phase = "finished";
               match.message = "RUN OVER";
               audio.tone(130, 0.35, 0.12, "triangle");
+            }
+          }
+          if (
+            match.mode === "dribbling-race" ||
+            match.mode === "solo-dribbling" ||
+            match.mode === "bot-ranked"
+          ) {
+            const result = dribblingChallenge.advance(
+              simulation.ball.translation(),
+            );
+            if (result.complete && !match.phase.includes("finished")) {
+              const cleared = Math.min(
+                dribblingChallenge.level + 1,
+                dribblingChallenge.levelCount,
+              );
+              dribblingChallenge.best = Math.max(
+                dribblingChallenge.best,
+                cleared,
+              );
+              match.score = [cleared, dribblingChallenge.best];
+              if (cleared >= dribblingChallenge.levelCount) {
+                match.phase = "finished";
+                match.message = "ALL 20 LEVELS CLEARED";
+                audio.tone(620, 0.35, 0.12, "triangle");
+              } else {
+                match.phase = "goal";
+                match.freeze = 1.25;
+                match.message = `LEVEL ${cleared} CLEARED`;
+                dribblingChallenge.start(dribblingChallenge.level + 1);
+                audio.tone(460 + cleared * 12, 0.2, 0.08, "sine");
+              }
             }
           }
           if (wasDemolished && simulation.cars[0].demolitionState === "active")
