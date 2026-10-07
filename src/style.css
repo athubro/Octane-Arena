@@ -1617,10 +1617,11 @@ output {
   margin-top: 0;
 }
 .extra-mode-grid {
-  grid-template-columns: minmax(240px, 390px);
-  justify-content: center;
-  align-items: center;
-  margin-top: 0;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  width: min(1040px, 100%);
+  margin: 0 auto;
+  align-items: stretch;
+  justify-items: stretch;
 }
 .field-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));

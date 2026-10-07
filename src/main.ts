@@ -334,6 +334,7 @@ async function boot() {
       mode === "dribbling-race" ||
       mode === "solo-dribbling" ||
       mode === "bot-ranked";
+    ringMap.setMode(mode === "rings" ? "rings" : "dribble");
     simulation.setRingCourse(ringLikeMode, RingChallenge.startingPosition);
     arena.setVisible(!ringLikeMode);
     ringMap.setVisible(ringLikeMode);
