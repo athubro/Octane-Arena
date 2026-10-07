@@ -200,9 +200,9 @@ export class GoalExplosion {
       this.blueOut.children.slice(1).forEach((child, i) => {
         child.scale.setScalar(1 + t * (8 + i * 1.5));
         child.rotation.z += dt * (i % 2 ? -1 : 1) * 0.3;
-        (child as T.Mesh).material instanceof T.Material &&
-          ((child as T.Mesh).material as T.MeshBasicMaterial).opacity =
-            Math.max(0, 1 - t / 2.8);
+        const material = (child as T.Mesh).material;
+        if (material instanceof T.MeshBasicMaterial)
+          material.opacity = Math.max(0, 1 - t / 2.8);
       });
     } else {
       this.skull.scale.setScalar(0.2 + Math.min(1, t * 2.1) * 1.05);
