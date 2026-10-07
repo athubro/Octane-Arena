@@ -305,11 +305,16 @@ async function boot() {
     audio.unlock();
     input.clear();
     updatePreset();
-    opponent.level = rankedQueue ? rankedBot.level : 3;
+    opponent.level = rankedQueue
+      ? rankedBot.level
+      : mode === "heatseeker"
+        ? 7
+        : 3;
     ui.rankedResult = "";
     rankedSettled = false;
     ringChallenge.start();
     ringCourse.syncActiveGate();
+    opponent.setHeatseekerMode(mode === "heatseeker");
     opponent.reset();
     opponent.rename();
     simulation.configurePlayers([
@@ -324,8 +329,7 @@ async function boot() {
     simulation.cars.forEach((car) => car.setProRankedCpu(false));
     document.getElementById("bot-tag")!.textContent = opponent.name;
     activePartyGameId = null;
-    const proRankedCpu =
-      mode === "bot" && rankedQueue && rankedBot.level === 10;
+    const proRankedCpu = rankedQueue && rankedBot.level === 10;
     match.rankedCpuCannotLose = proRankedCpu;
     simulation.setHeatseeker(mode === "heatseeker");
     match.start(simulation, mode);
@@ -454,6 +458,9 @@ async function boot() {
     document
       .getElementById("cpu-level-control")!
       .toggleAttribute("hidden", true);
+    document
+      .getElementById("cpu-ranked-mode-control")!
+      .toggleAttribute("hidden", true);
     ui.fields(true);
     document
       .querySelectorAll<HTMLButtonElement>("[data-field]")
@@ -467,14 +474,27 @@ async function boot() {
   ui.on("bot-mode", () => chooseMode("bot"));
   ui.on("heatseeker-mode", () => chooseMode("heatseeker"));
   ui.on("ranked-mode", () => {
+    (document.getElementById("cpu-ranked-mode") as HTMLSelectElement).value =
+      "bot";
     chooseMode("bot");
     rankedQueue = true;
     document.getElementById("cpu-level-control")!.removeAttribute("hidden");
+    document
+      .getElementById("cpu-ranked-mode-control")!
+      .removeAttribute("hidden");
     const select = document.getElementById("cpu-level") as HTMLSelectElement;
     select.value = String(rankedBot.level);
     document.getElementById("cpu-elo-label")!.textContent =
       `CPU ELO ${rankedBot.elo}`;
   });
+  document
+    .getElementById("cpu-ranked-mode")!
+    .addEventListener("change", (event) => {
+      pendingMode =
+        (event.currentTarget as HTMLSelectElement).value === "heatseeker"
+          ? "heatseeker"
+          : "bot";
+    });
   ui.on("freeplay-mode", () => chooseMode("freeplay"));
   ui.on("training-packs-mode", () => {
     rankedQueue = false;
@@ -818,6 +838,9 @@ async function boot() {
                     simulation.clock,
                     simulation.ball.linvel(),
                     [simulation.cars[0]],
+                    simulation.cars.find(
+                      (car) => car.id === simulation.lastTouchId,
+                    )?.team ?? null,
                   ),
             ]);
           if (match.mode === "rings") {

@@ -47,7 +47,10 @@ export class Car {
   aerialControl = 1;
   private proRankedCpu = false;
   get maxLinearSpeed() {
-    return P.car.maxSpeed * (this.proRankedCpu ? 1.24 : 1);
+    return P.car.maxSpeed * (this.proRankedCpu ? 1.35 : 1);
+  }
+  get isProRankedCpu() {
+    return this.proRankedCpu;
   }
   setProRankedCpu(enabled: boolean) {
     this.proRankedCpu = enabled && this.controller === "bot";
@@ -58,7 +61,7 @@ export class Car {
   }
   get angularLimit() {
     return (this.jump.flipLeft > 0 ? P.jump.flipMaxAngular : P.car.maxAngular) *
-      (this.proRankedCpu ? 1.22 : 1);
+      (this.proRankedCpu ? 1.35 : 1);
   }
   private surfaceForward = new Vector3();
   private surfaceRight = new Vector3();

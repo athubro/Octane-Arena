@@ -32,8 +32,10 @@ export class Opponent {
   private localOpponent = new Vector3();
   private aerialPoint = new Vector3();
   private aerialLocal = new Vector3();
+  private heatseekerDirection = new Vector3();
+  private heatseekerVelocity = new Vector3();
   private readonly predictionStep = P.dt * 2;
-  private readonly predictionHorizon = 180;
+  private readonly predictionHorizon = 240;
   private readonly predictedX = new Float32Array(this.predictionHorizon + 1);
   private readonly predictedY = new Float32Array(this.predictionHorizon + 1);
   private readonly predictedZ = new Float32Array(this.predictionHorizon + 1);
@@ -46,6 +48,7 @@ export class Opponent {
   private directCommitUntil = 0;
   private aerialLaunchedAt = -Infinity;
   private aerialDoubleUsed = false;
+  private heatseekerMode = false;
   constructor() {
     this.rename();
   }
@@ -77,12 +80,17 @@ export class Opponent {
     this.aerialPoint.set(0, 0, 0);
   }
 
+  setHeatseekerMode(enabled: boolean) {
+    this.heatseekerMode = enabled;
+  }
+
   sample(
     car: Car,
     ball: { x: number; y: number; z: number },
     time: number,
     ballVelocity: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 },
     opponents: readonly Car[] = [],
+    heatseekerTargetTeam: number | null = null,
   ): Controls {
     const c = neutral();
     const p = car.body.translation();
@@ -119,6 +127,7 @@ export class Opponent {
         ownGoalSign,
         skill,
         aerialSkill,
+        this.heatseekerMode ? heatseekerTargetTeam : null,
       ),
       interceptTime = plan.time,
       hasAerialIntercept = aerialSkill > 0 && plan.airborne && plan.feasible,
@@ -255,7 +264,7 @@ export class Opponent {
     // coasted when fast, so a pro bot kept sliding past its approach point.
     const maxApproachSpeed =
         skill >= 0.99
-          ? Math.min(car.maxLinearSpeed * 0.88, P.car.maxSpeed * 1.08)
+          ? Math.min(car.maxLinearSpeed * 0.92, P.car.maxSpeed * 1.3)
           : 8 + skill * 14,
       distanceToContact = Math.max(0, distance - 1.5),
       contactSpeed = 6 + skill * 4,
@@ -364,6 +373,7 @@ export class Opponent {
   private predictBallTrajectory(
     ball: { x: number; y: number; z: number },
     velocity: { x: number; y: number; z: number },
+    heatseekerTargetTeam: number | null,
   ) {
     const a = P.arena,
       r = P.ball.radius,
@@ -490,6 +500,27 @@ export class Opponent {
         }
       }
 
+      if (heatseekerTargetTeam !== null) {
+        const speed = Math.hypot(vx, vy, vz),
+          targetZ =
+            (heatseekerTargetTeam === 0 ? -1 : 1) *
+            (a.halfLength + a.goalDepth - 1.2);
+        if (speed > 1e-4) {
+          this.heatseekerDirection
+            .set(-x, 2.1 - y, targetZ - z)
+            .normalize();
+          this.heatseekerVelocity
+            .set(vx, vy, vz)
+            .normalize()
+            .lerp(this.heatseekerDirection, 0.018)
+            .normalize()
+            .multiplyScalar(speed);
+          vx = this.heatseekerVelocity.x;
+          vy = this.heatseekerVelocity.y;
+          vz = this.heatseekerVelocity.z;
+        }
+      }
+
       this.predictedX[i] = x;
       this.predictedY[i] = y;
       this.predictedZ[i] = z;
@@ -510,8 +541,9 @@ export class Opponent {
     ownGoalSign: number,
     skill: number,
     aerialSkill: number,
+    heatseekerTargetTeam: number | null,
   ): InterceptPlan {
-    this.predictBallTrajectory(ball, ballVelocity);
+    this.predictBallTrajectory(ball, ballVelocity, heatseekerTargetTeam);
     const p = car.body.translation(),
       velocity = car.body.linvel(),
       carSpeed = Math.hypot(velocity.x, velocity.z),
@@ -584,10 +616,14 @@ export class Opponent {
         distanceNeeded = Math.max(0, distance - 1.2),
         deficit = distanceNeeded - reachable,
         requiredRise = Math.max(0, by - (p.y + 0.95)),
+        aerialTime = Math.max(0, t - 0.28),
         aerialReach =
-          1.55 +
-          aerialSkill * 0.65 +
-          (aerialSkill > 0.65 ? 0.5 * 5.6 * Math.max(0, t - 0.32) ** 2 : 0),
+          1.75 +
+          aerialSkill * 0.7 +
+          (aerialSkill >= 0.35
+            ? 0.5 * (3.5 + aerialSkill * 4) * aerialTime ** 2 +
+              aerialSkill * 2.3 * aerialTime
+            : 0),
         heightReachable = !airborne || requiredRise <= aerialReach,
         feasible = deficit <= 0 && heightReachable,
         plan: InterceptPlan = {

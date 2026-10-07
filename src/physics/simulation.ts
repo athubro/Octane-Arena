@@ -605,7 +605,21 @@ export class Simulation {
       strength: closing,
       age: 0,
     });
-    if (this.heatseekerEnabled) this.launchHeatseekerBall(c.team);
+    if (this.heatseekerEnabled) {
+      this.launchHeatseekerBall(c.team);
+      if (c.isProRankedCpu) {
+        const velocity = new Vector3().copy(this.ball.linvel());
+        this.ball.setLinvel(velocity.normalize().multiplyScalar(38), true);
+      }
+    } else if (c.isProRankedCpu) {
+      // Level ten has a reliable finishing touch: after a real, closing
+      // collision, send the ball through the center of the opposing goal.
+      const goalZ =
+          (c.team === 0 ? -1 : 1) *
+          (P.arena.halfLength + P.arena.goalDepth - 1.2),
+        shot = new Vector3(0, 2.6, goalZ).sub(this.ball.translation());
+      this.ball.setLinvel(shot.normalize().multiplyScalar(38), true);
+    }
   }
   private launchHeatseekerBall(team: number) {
     this.heatseekerTargetTeam = team;
