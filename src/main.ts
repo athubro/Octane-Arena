@@ -285,7 +285,8 @@ async function boot() {
   let rankedQueue = false,
     rankedSettled = false;
   const start = (
-    mode: "bot" | "heatseeker" | "freeplay" | "rings" = match.mode === "freeplay"
+    mode: "bot" | "heatseeker" | "freeplay" | "rings" = match.mode ===
+    "freeplay"
       ? "freeplay"
       : match.mode === "rings"
         ? "rings"
@@ -450,9 +451,7 @@ async function boot() {
   });
   ui.on("standard-modes-tab", () => ui.modeTab(false));
   ui.on("extra-modes-tab", () => ui.modeTab(true));
-  const chooseMode = (
-    mode: "bot" | "heatseeker" | "freeplay" | "rings",
-  ) => {
+  const chooseMode = (mode: "bot" | "heatseeker" | "freeplay" | "rings") => {
     pendingMode = mode;
     rankedQueue = false;
     document
@@ -1273,6 +1272,7 @@ async function boot() {
     Object.assign(window, {
       __arena: {
         simulation,
+        botBrains,
         match,
         ringChallenge,
         ringCourse,

@@ -50,7 +50,11 @@ export const presetSchema = z
       .min(1)
       .max(32)
       .regex(/^[A-Za-z0-9 _-]+$/),
-    body: z.enum(["ion", "vector", "riptide"]),
+    // Old account saves can still contain Ion; upgrade them to the default
+    // Vector body when they are loaded.
+    body: z
+      .enum(["ion", "vector", "riptide"])
+      .transform((body) => (body === "ion" ? "vector" : body)),
     blue: z
       .string()
       .refine((v) => palette.includes(v), "Choose a palette color."),

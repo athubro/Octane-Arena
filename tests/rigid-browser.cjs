@@ -69,11 +69,12 @@ const fs = require("node:fs"),
         a.camera.updateProjectionMatrix();
       };
     });
-    for (const id of ["ion", "vector"]) {
+    for (const id of ["vector", "riptide"]) {
       await page.evaluate((id) => {
         const s = window.__arena.simulation,
           c = s.cars[0];
-        window.__arena.garage.current.body=id; window.__arena.garagePanel.change();
+        window.__arena.garage.current.body = id;
+        window.__arena.garagePanel.change();
         c.reset(29, 0, -Math.PI / 2);
         c.body.setLinvel({ x: 23, y: 0, z: 0 }, true);
       }, id);
@@ -103,7 +104,10 @@ const fs = require("node:fs"),
               c.boost = 100;
               a.physicsStep([{ ...idle, throttle: 1, boost: true }, idle]);
               i++;
-            } while ((name === "floor" ? i < 20 : c.body.translation().y < height) && i < 600);
+            } while (
+              (name === "floor" ? i < 20 : c.body.translation().y < height) &&
+              i < 600
+            );
             c.pose.snap();
             return { steps: i, position: c.body.translation() };
           },
@@ -125,4 +129,3 @@ const fs = require("node:fs"),
   console.error(e);
   process.exitCode = 1;
 });
-

@@ -36,7 +36,7 @@ export class Car {
   boosting = false;
   lastJump = false;
   flipResetCount = 0;
-  bodyId: BodyId = "ion";
+  bodyId: BodyId = "standard";
   steerAngle = 0;
   handbrake = 0;
   private driftSign = 1;
@@ -67,8 +67,10 @@ export class Car {
     return this.recovery > 0;
   }
   get angularLimit() {
-    return (this.jump.flipLeft > 0 ? P.jump.flipMaxAngular : P.car.maxAngular) *
-      (this.proRankedCpu ? 1.35 : 1);
+    return (
+      (this.jump.flipLeft > 0 ? P.jump.flipMaxAngular : P.car.maxAngular) *
+      (this.proRankedCpu ? 1.35 : 1)
+    );
   }
   private surfaceForward = new Vector3();
   private surfaceRight = new Vector3();
@@ -433,17 +435,24 @@ export class Car {
         this.angular
           .addScaledVector(
             this.right,
-            -input.pitch * c.airPitch * pitchScale * this.aerialControl *
+            -input.pitch *
+              c.airPitch *
+              pitchScale *
+              this.aerialControl *
               (this.proRankedCpu ? 1.3 : 1),
           )
           .addScaledVector(
             this.up,
-            -input.yaw * c.airYaw * this.aerialControl *
+            -input.yaw *
+              c.airYaw *
+              this.aerialControl *
               (this.proRankedCpu ? 1.3 : 1),
           )
           .addScaledVector(
             this.forward,
-            input.roll * c.airRoll * this.aerialControl *
+            input.roll *
+              c.airRoll *
+              this.aerialControl *
               (this.proRankedCpu ? 1.3 : 1),
           )
           .addScaledVector(this.w, -c.airDamping * this.aerialControl);
@@ -531,7 +540,9 @@ export class Car {
       );
       this.recovery = Math.max(0, this.recovery - dt);
     }
-    this.v.addScaledVector(this.acceleration, dt).clampLength(0, this.maxLinearSpeed);
+    this.v
+      .addScaledVector(this.acceleration, dt)
+      .clampLength(0, this.maxLinearSpeed);
     b.setLinvel(this.v, true);
     this.w.addScaledVector(this.angular, dt).clampLength(0, this.angularLimit);
     b.setAngvel(this.w, true);

@@ -26,9 +26,9 @@
     "minDistance": 5.727128425310544
   },
   "wall -1 transition 30 fps ball=true": {
-    "maxSpeed": 7.78795411499409,
-    "maxTurn": 0.5660834812372291,
-    "minDistance": 4.659263187121302
+    "maxSpeed": 7.541660423172353,
+    "maxTurn": 0.44949365735771424,
+    "minDistance": 4.889868508546735
   },
   "wall -1 transition 60 fps ball=false": {
     "maxSpeed": 1.0165478084400812,
@@ -36,9 +36,9 @@
     "minDistance": 5.727128425310545
   },
   "wall -1 transition 60 fps ball=true": {
-    "maxSpeed": 8.654065497950876,
-    "maxTurn": 0.5693316979033517,
-    "minDistance": 4.6274037838159305
+    "maxSpeed": 7.649803792993884,
+    "maxTurn": 0.46174039815256795,
+    "minDistance": 4.85734287280876
   },
   "wall -1 transition 144 fps ball=false": {
     "maxSpeed": 1.0165655302073484,
@@ -46,9 +46,9 @@
     "minDistance": 5.727128425310545
   },
   "wall -1 transition 144 fps ball=true": {
-    "maxSpeed": 9.36175439218151,
-    "maxTurn": 0.5671055235904308,
-    "minDistance": 4.638964794418084
+    "maxSpeed": 7.708438071494567,
+    "maxTurn": 0.45671931187640574,
+    "minDistance": 4.854509040866662
   },
   "wall 1 transition 30 fps ball=false": {
     "maxSpeed": 1.016483476960244,
@@ -56,9 +56,9 @@
     "minDistance": 5.727128425310544
   },
   "wall 1 transition 30 fps ball=true": {
-    "maxSpeed": 7.788068875115892,
-    "maxTurn": 0.5618110333713168,
-    "minDistance": 4.662204493370942
+    "maxSpeed": 7.5417628701446535,
+    "maxTurn": 0.44317537481618113,
+    "minDistance": 4.892470875082074
   },
   "wall 1 transition 60 fps ball=false": {
     "maxSpeed": 1.0165478084400812,
@@ -66,9 +66,9 @@
     "minDistance": 5.727128425310545
   },
   "wall 1 transition 60 fps ball=true": {
-    "maxSpeed": 8.652668023488895,
-    "maxTurn": 0.5649098654527888,
-    "minDistance": 4.630337748027076
+    "maxSpeed": 7.649903096780885,
+    "maxTurn": 0.4557123884543079,
+    "minDistance": 4.8599424472001465
   },
   "wall 1 transition 144 fps ball=false": {
     "maxSpeed": 1.0165655302073484,
@@ -76,8 +76,8 @@
     "minDistance": 5.727128425310545
   },
   "wall 1 transition 144 fps ball=true": {
-    "maxSpeed": 9.356959282812635,
-    "maxTurn": 0.5625763408984051,
-    "minDistance": 4.641853358897265
+    "maxSpeed": 7.708533252112089,
+    "maxTurn": 0.4505428172351212,
+    "minDistance": 4.857080424193723
   }
 }

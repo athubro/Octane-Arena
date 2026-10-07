@@ -47,7 +47,7 @@ function orient(s: Simulation, p: Vector3, up: Vector3, forward: Vector3) {
   );
   s.world.step();
 }
-for (const id of ["ion", "vector", "riptide"] as const) {
+for (const id of ["vector", "riptide"] as const) {
   for (const mode of [
     "stationary",
     "accelerate",
@@ -325,7 +325,7 @@ check("ceiling drive then loss of contact falls freely", () => {
   assert.ok(!c.grounded && c.body.translation().y < P.arena.height - 2);
   s.dispose();
 });
-for (const id of ["ion", "vector", "riptide"] as const)
+for (const id of ["vector", "riptide"] as const)
   for (const sign of [-1, 1])
     check(`${id} goal interior curve ${sign}`, () => {
       const s = fixture(),

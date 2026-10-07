@@ -23,7 +23,7 @@ export function box(
 }
 export function carModel(
   color: number,
-  bodyId: BodyId = "ion",
+  bodyId: BodyId = "vector",
   wheels = "apex",
   decal = "none",
 ) {

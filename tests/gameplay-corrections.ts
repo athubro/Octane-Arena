@@ -341,7 +341,7 @@ check(
     s.dispose();
   },
 );
-for (const id of ["ion", "vector"] as const)
+for (const id of ["vector", "riptide"] as const)
   check(
     `${id} training placement follows orientation and clears the collider`,
     () => {

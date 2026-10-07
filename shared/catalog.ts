@@ -1,12 +1,13 @@
-/** Original starter bodies. Dimensions are half extents in metres, shared by art and physics.
- * Design direction: preserve Ion as the original low/slim body. Other and future
- * bodies should have a visibly taller cabin, with matching physical roof height.
+/** Starter body dimensions are shared by art and physics.
+ * Bodies have distinct silhouettes and matching physical hitboxes.
  * Vary silhouettes, not just heights: Vector is an upright rally hatch; future
  * bodies should explore distinct buggy, truck or van proportions and details.
  */
 export const bodies = {
-  ion: {
-    name: "Ion",
+  // Simulation's neutral spawn collider. The garage always replaces this
+  // with the selected body before a match begins.
+  standard: {
+    name: "Standard",
     halfWidth: 0.42,
     halfHeight: 0.18,
     halfLength: 0.59,
@@ -16,10 +17,10 @@ export const bodies = {
   vector: {
     name: "Vector",
     halfWidth: 0.43,
-    halfHeight: 0.25,
-    halfLength: 0.66,
-    hitboxY: 0.13, // Raise the roof while preserving the existing underside clearance.
-    axle: 0.49,
+    halfHeight: 0.19,
+    halfLength: 0.6,
+    hitboxY: 0.05, // A slightly taller replacement body with matching roof clearance.
+    axle: 0.43,
   },
   riptide: {
     name: "Riptide",
@@ -31,9 +32,9 @@ export const bodies = {
   },
 } as const;
 export type BodyId = keyof typeof bodies;
+export type PresetBodyId = Exclude<BodyId, "standard">;
 export const inventory = {
   body: [
-    { id: "ion", name: "Ion" },
     { id: "vector", name: "Vector" },
     { id: "riptide", name: "Riptide" },
   ],
@@ -57,7 +58,7 @@ export type Team = "blue" | "orange";
 export interface Preset {
   id: string;
   name: string;
-  body: BodyId;
+  body: PresetBodyId;
   blue: string;
   orange: string;
   wheels: string;
@@ -113,7 +114,7 @@ export const palette = [
 export const starter = (): Preset => ({
   id: "starter",
   name: "Preset 1",
-  body: "ion",
+  body: "vector",
   blue: "#36cedd",
   orange: "#f89a49",
   wheels: "apex",

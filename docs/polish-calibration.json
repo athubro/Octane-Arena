@@ -5,7 +5,7 @@
     "data": {
       "supported": 133,
       "lost": 0,
-      "maxHeight": 15.000090599060059
+      "maxHeight": 15.026304244995117
     }
   },
   {
@@ -14,7 +14,7 @@
     "data": {
       "supported": 81,
       "lost": 0,
-      "maxHeight": 15.115666389465332
+      "maxHeight": 15.028489112854004
     }
   },
   {
@@ -23,7 +23,7 @@
     "data": {
       "supported": 121,
       "lost": 0,
-      "maxHeight": 15.056427001953125
+      "maxHeight": 15.068191528320312
     }
   },
   {
@@ -32,25 +32,25 @@
     "data": {
       "supported": 70,
       "lost": 0,
-      "maxHeight": 15.081610679626465
+      "maxHeight": 15.14968204498291
     }
   },
   {
     "name": "wall entry speed 23 boost false",
     "pass": true,
     "data": {
-      "supported": 75,
+      "supported": 74,
       "lost": 0,
-      "maxHeight": 15.095796585083008
+      "maxHeight": 15.009249687194824
     }
   },
   {
     "name": "wall entry speed 23 boost true",
     "pass": true,
     "data": {
-      "supported": 59,
+      "supported": 61,
       "lost": 0,
-      "maxHeight": 15.116203308105469
+      "maxHeight": 15.102206230163574
     }
   },
   {
@@ -59,19 +59,13 @@
   },
   {
     "name": "side recovery -1",
-    "pass": true,
-    "data": {
-      "triggered": true,
-      "recovered": true
-    }
+    "pass": false,
+    "error": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:\n\n  assert.ok(triggered && recovered)\n"
   },
   {
     "name": "side recovery 1",
-    "pass": true,
-    "data": {
-      "triggered": true,
-      "recovered": true
-    }
+    "pass": false,
+    "error": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:\n\n  assert.ok(triggered && recovered)\n"
   },
   {
     "name": "flip rigid-body angular calibration",
@@ -81,19 +75,19 @@
       "samples": [
         {
           "time": 0.1,
-          "angle": 0.6610376408203686
+          "angle": 0.661062533950861
         },
         {
           "time": 0.2,
-          "angle": 1.3610305499988518
+          "angle": 1.361030901550863
         },
         {
           "time": 0.4,
-          "angle": 2.7609492148162746
+          "angle": 2.760930384814443
         },
         {
           "time": 0.65,
-          "angle": 4.498280860277833
+          "angle": 4.498315153837464
         }
       ]
     }
@@ -104,11 +98,13 @@
   },
   {
     "name": "valid demolition attacker 0 and 3 second respawn",
-    "pass": true
+    "pass": false,
+    "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'active'\n- 'demolished'\n"
   },
   {
     "name": "valid demolition attacker 1 and 3 second respawn",
-    "pass": true
+    "pass": false,
+    "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'active'\n- 'demolished'\n"
   },
   {
     "name": "demo rejects slow, teammate, rear and lateral contacts",
@@ -116,7 +112,8 @@
   },
   {
     "name": "goal during demolition preserves identity and kickoff restores cars",
-    "pass": true
+    "pass": false,
+    "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'active'\n- 'demolished'\n"
   },
   {
     "name": "kickoff boosts and bot names survive goal flow",

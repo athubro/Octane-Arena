@@ -168,7 +168,7 @@ const fs = require("node:fs"),
       await page.waitForTimeout(200);
       await page.screenshot({ path: `docs/goal-corners-${sign}.png` });
     }
-    for (const body of ["ion", "vector"]) {
+    for (const body of ["vector", "riptide"]) {
       await page.evaluate((body) => {
         const a = window.__arena;
         a.garage.current.body = body;

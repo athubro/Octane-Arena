@@ -21,7 +21,7 @@ function check(name: string, run: () => unknown) {
     console.log("FAIL", name, String(e));
   }
 }
-for (const id of ["ion", "vector"] as const)
+for (const id of ["vector", "riptide"] as const)
   for (const speed of [3, 23])
     check(`wheel tread clearance ${id} ${speed}m/s`, () => {
       const s = new Simulation(),
@@ -71,7 +71,7 @@ for (const id of ["ion", "vector"] as const)
       assert.ok(min > -0.025, `penetration ${min}`);
       return { min, samples };
     });
-for (const id of ["ion", "vector"] as const)
+for (const id of ["vector", "riptide"] as const)
   for (const side of [-1, 1])
     check(`side recovery contact manifold ${id} ${side}`, () => {
       const s = new Simulation(true),

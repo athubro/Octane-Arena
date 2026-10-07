@@ -17,6 +17,26 @@ interface InterceptPlan {
   feasible: boolean;
 }
 
+export interface OpponentTelemetry {
+  ball: [number, number, number];
+  predictedIntercept: [number, number, number];
+  car: [number, number, number];
+  desiredPosition: [number, number, number];
+  eta: number;
+  steeringError: number;
+  speedError: number;
+  action: string;
+  confidence: number;
+  reason: string;
+  feasible: boolean;
+  prediction: [number, number, number][];
+  history: {
+    time: number;
+    ball: [number, number, number];
+    car: [number, number, number];
+  }[];
+}
+
 /** Ranked rival with progressively faster reads, cleaner hits, and aerial play. */
 export class Opponent {
   name = "";
@@ -49,6 +69,22 @@ export class Opponent {
   private aerialLaunchedAt = -Infinity;
   private aerialDoubleUsed = false;
   private heatseekerMode = false;
+  private stateHistory: OpponentTelemetry["history"] = [];
+  telemetry: OpponentTelemetry = {
+    ball: [0, 0, 0],
+    predictedIntercept: [0, 0, 0],
+    car: [0, 0, 0],
+    desiredPosition: [0, 0, 0],
+    eta: 0,
+    steeringError: 0,
+    speedError: 0,
+    action: "Approach",
+    confidence: 0,
+    reason: "Waiting for a decision cycle.",
+    feasible: false,
+    prediction: [],
+    history: [],
+  };
   constructor() {
     this.rename();
   }
@@ -78,6 +114,7 @@ export class Opponent {
     this.aerialDoubleUsed = false;
     this.target.set(0, 0, 0);
     this.aerialPoint.set(0, 0, 0);
+    this.stateHistory = [];
   }
 
   setHeatseekerMode(enabled: boolean) {
@@ -94,6 +131,12 @@ export class Opponent {
   ): Controls {
     const c = neutral();
     const p = car.body.translation();
+    this.stateHistory.push({
+      time,
+      ball: [ball.x, ball.y, ball.z],
+      car: [p.x, p.y, p.z],
+    });
+    if (this.stateHistory.length > 8) this.stateHistory.shift();
     const skill = Math.max(0, Math.min(1, (this.level - 1) / 9));
     let shotTargetX = 0;
     if (skill > 0.65) {
@@ -366,6 +409,62 @@ export class Opponent {
       c.pitch = car.forward.y > 0.05 ? 0.3 : -0.22;
       c.roll = car.right.y * 0.65;
     }
+    const action =
+        aerialActive && !car.grounded
+          ? "Aerial interception"
+          : directCommit
+            ? "Challenge"
+            : ownGoalDanger
+              ? "Defensive clear"
+              : !safeSide
+                ? "Reposition behind ball"
+                : "Controlled approach",
+      reason = !plan.feasible
+        ? "No reachable predicted contact; taking the safest available fallback."
+        : ownGoalDanger
+          ? "Predicted ball path threatens the own goal; favor a defensive contact."
+          : !safeSide
+            ? "Approach from the goal side would create a poor touch; circling to the safe side."
+            : hasAerialIntercept
+              ? "Aerial target is based on the predicted ball position and estimated arrival time."
+              : "Selected the earliest reachable point on a safe approach line.",
+      prediction = [0, 12, 24, 36, 48, 60, 72]
+        .filter((i) => i < this.predictedCount)
+        .map(
+          (i) =>
+            [this.predictedX[i], this.predictedY[i], this.predictedZ[i]] as [
+              number,
+              number,
+              number,
+            ],
+        );
+    this.telemetry = {
+      ball: [ball.x, ball.y, ball.z],
+      predictedIntercept: [plan.ballX, plan.ballY, plan.ballZ],
+      car: [p.x, p.y, p.z],
+      desiredPosition: [this.target.x, this.target.y, this.target.z],
+      eta: interceptTime,
+      steeringError: angle,
+      speedError: desiredSpeed - car.forwardSpeed,
+      action,
+      confidence: Math.max(
+        0,
+        Math.min(
+          1,
+          (plan.feasible ? 0.72 : 0.25) +
+            (safeSide ? 0.16 : 0) +
+            (absAngle < 0.5 ? 0.12 : 0),
+        ),
+      ),
+      reason,
+      feasible: plan.feasible,
+      prediction,
+      history: this.stateHistory.map((state) => ({
+        ...state,
+        ball: [...state.ball],
+        car: [...state.car],
+      })),
+    };
     return c;
   }
 
@@ -506,9 +605,7 @@ export class Opponent {
             (heatseekerTargetTeam === 0 ? -1 : 1) *
             (a.halfLength + a.goalDepth - 1.2);
         if (speed > 1e-4) {
-          this.heatseekerDirection
-            .set(-x, 2.1 - y, targetZ - z)
-            .normalize();
+          this.heatseekerDirection.set(-x, 2.1 - y, targetZ - z).normalize();
           this.heatseekerVelocity
             .set(vx, vy, vz)
             .normalize()

@@ -22,7 +22,7 @@ function check(name: string, pass: boolean, data: unknown) {
   console.log(`${pass ? "PASS" : "FAIL"} ${name}: ${JSON.stringify(data)}`);
   if (!pass) failures++;
 }
-for (const id of ["ion", "vector"] as const) {
+for (const id of ["vector", "riptide"] as const) {
   const s = new Simulation(true),
     c = s.cars[0],
     d = bodies[id];

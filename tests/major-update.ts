@@ -177,10 +177,6 @@ for (const slide of [false, true]) {
     visualRadius: max,
     diameter: 2 * max,
     cars: {
-      ion: new Box3()
-        .setFromObject(carModel(0xffffff, "ion"))
-        .getSize(new Vector3())
-        .toArray(),
       vector: new Box3()
         .setFromObject(carModel(0xffffff, "vector"))
         .getSize(new Vector3())
