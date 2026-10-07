@@ -298,14 +298,17 @@ export class Car {
         }
       }
     }
+    const invertedSideSupport =
+      sideSupport && this.up.dot(sideSupport) < -0.3 && this.grounded;
     this.stuckTime = sideSupport ? this.stuckTime + dt : 0;
     if (
       sideSupport &&
-      this.stuckTime >= c.stuckTime &&
+      (this.stuckTime >= c.stuckTime || invertedSideSupport) &&
       this.recoveryCooldown === 0
     ) {
-      // A forced roll can pin the chassis into rounded wall transitions.
-      // Nudge it off the contacted surface and leave steering/jump control live.
+      // Rounded wall transitions can trap an upside-down car if it keeps a
+      // near-horizontal slide contact along the shell. Kick it away from the
+      // wall while preserving steering and jump authority.
       this.v.addScaledVector(sideSupport, 2.5);
       this.v.addScaledVector(this.forward, 0.8);
       this.recoveryCooldown = c.recoveryCooldown;

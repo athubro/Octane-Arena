@@ -16,7 +16,7 @@ export class UI {
     this.root.innerHTML = `<div id="viewport"></div><div id="home-shade"></div><header id="brand"><h1>OCTANE <span>ARENA</span></h1><small class="brand-version">V6</small></header>
     <section id="menu" class="screen"><nav class="home-nav"><button id="play" class="nav-button primary">PLAY <span aria-hidden="true">↗</span></button><button id="garage-open" class="nav-button">GARAGE</button><button id="settings-open" class="nav-button">SETTINGS</button></nav></section>
     <button id="profile" aria-label="Open profile"><div class="avatar">${icon("profile")}</div><div><b id="profile-name">Guest</b><span id="profile-title">Rookie</span></div><div class="level"><small>LEVEL</small><b id="profile-level">1</b></div></button>
-    <section id="modes" class="screen full-screen" hidden><h2>PLAY</h2><nav class="mode-tabs" aria-label="Game mode category"><button id="standard-modes-tab" aria-pressed="true">STANDARD</button><button id="extra-modes-tab" aria-pressed="false">EXTRA MODES</button></nav><div class="mode-grid standard-mode-grid"><button id="bot-mode" class="mode-card">${icon("bot")}<strong>AGAINST A BOT</strong></button><button id="heatseeker-mode" class="mode-card"><span class="heatseeker-mode-icon" aria-hidden="true">🔥</span><strong>HEATSEEKER VS BOT</strong><small>THE BALL HUNTS THE LAST PLAYER'S GOAL</small></button><button id="freeplay-mode" class="mode-card">${icon("freeplay")}<strong>FREE PLAY</strong></button><button id="training-packs-mode" class="mode-card"><span class="training-pack-emblem" aria-hidden="true">11</span><strong>TRAINING PACKS</strong><small>10 PACKS · 11 SHOTS EACH · SAVE YOUR BEST SCORE</small></button><button id="ranked-mode" class="mode-card">${icon("ranked")}<strong>RANKED CPU</strong><small>CHOOSE A CPU LEVEL · EARN CPU ELO ON WINS</small></button><button class="mode-card" disabled title="Friend matches are coming later">${icon("friend")}<strong>AGAINST A FRIEND</strong><i>${icon("lock")}</i></button></div><div class="mode-grid extra-mode-grid" hidden><button id="rings-mode" class="mode-card"><span class="rings-mode-icon" aria-hidden="true">◎</span><strong>RING RUSH</strong><small>FLY THROUGH NUMBERED RINGS IN ORDER. ONE MISS ENDS YOUR STREAK.</small></button></div><footer class="screen-footer"><button id="modes-back" class="back-button">← BACK</button></footer></section>
+    <section id="modes" class="screen full-screen" hidden><h2>PLAY</h2><nav class="mode-tabs" aria-label="Game mode category"><button id="standard-modes-tab" aria-pressed="true">STANDARD</button><button id="extra-modes-tab" aria-pressed="false">EXTRA MODES</button></nav><div class="mode-grid standard-mode-grid"><button id="bot-mode" class="mode-card">${icon("bot")}<strong>AGAINST A BOT</strong></button><button id="heatseeker-mode" class="mode-card"><span class="heatseeker-mode-icon" aria-hidden="true">🔥</span><strong>HEATSEEKER VS BOT</strong><small>THE BALL HUNTS THE LAST PLAYER'S GOAL</small></button><button id="freeplay-mode" class="mode-card">${icon("freeplay")}<strong>FREE PLAY</strong></button><button id="training-packs-mode" class="mode-card"><span class="training-pack-emblem" aria-hidden="true">11</span><strong>TRAINING PACKS</strong><small>10 PACKS · 11 SHOTS EACH · SAVE YOUR BEST SCORE</small></button><button id="ranked-mode" class="mode-card">${icon("ranked")}<strong>RANKED CPU</strong><small>CHOOSE A CPU LEVEL · EARN CPU ELO ON WINS</small></button><button class="mode-card" disabled title="Friend matches are coming later">${icon("friend")}<strong>AGAINST A FRIEND</strong><i>${icon("lock")}</i></button></div><div class="mode-grid extra-mode-grid" hidden><button id="dribbling-race-mode" class="mode-card"><span class="rings-mode-icon" aria-hidden="true">↗</span><strong>DRIBBLING RACE</strong><small>20 LEVELS · PROGRESSIVE TRACKS · RACE THE BOT</small></button><button id="solo-dribbling-mode" class="mode-card"><span class="rings-mode-icon" aria-hidden="true">◎</span><strong>SOLO DRIBBLING</strong><small>20 DRIBBLE CHALLENGES · CONTROL THE BALL UNDER PRESSURE</small></button><button id="bot-ranked-mode" class="mode-card">${icon("ranked")}<strong>BOT RANKED</strong><small>RANKED DRIBBLING MATCHES · RISING CPU DIFFICULTY</small></button><button id="rings-mode" class="mode-card"><span class="rings-mode-icon" aria-hidden="true">◎</span><strong>RINGS</strong><small>INFINITE GENERATION · NO FLOOR · SEAMLESS PROGRESSION</small></button></div><footer class="screen-footer"><button id="modes-back" class="back-button">← BACK</button></footer></section>
     <section id="training-pack-select" class="screen full-screen" hidden><header class="training-pack-header"><h2>TRAINING PACKS</h2><p>Eleven timed situations per pack. Read the SAVE or SCORE callout before each feed; complete the called play before time expires.</p><p class="pack-controls-note">CONTROLLER: RT/LT DRIVE · LEFT STICK STEER/AIR PITCH · A JUMP · B BOOST · X POWERSLIDE · Y BALL CAM · START PAUSE</p></header><div id="training-pack-list" class="training-pack-list"></div><footer class="screen-footer"><button id="packs-back" class="back-button">← MODES</button><span>BEST SCORES SAVE IN THIS BROWSER</span></footer></section>
     <section id="fields" class="screen full-screen" hidden><h2>SELECT FIELD</h2><label id="cpu-level-control" class="cpu-level-control" hidden>CPU LEVEL <select id="cpu-level">${["ROOKIE", "NOVICE", "CHALLENGER", "COMPETITOR", "SKILLED", "ADVANCED", "EXPERT", "ELITE", "MASTER", "PRO"].map((rank, i) => `<option value="${i + 1}">LEVEL ${i + 1} · ${rank}</option>`).join("")}</select><span id="cpu-elo-label">CPU ELO 0</span></label><div class="field-grid"><button class="field-card lumen-field" data-field="lumen" aria-pressed="true"><strong>LUMEN DISTRICT</strong><small>THE ORIGINAL STADIUM</small></button><button class="field-card neo-field" data-field="neo-tokyo" aria-pressed="false"><strong>NEO TOKYO</strong><small>NEON CITY ARENA</small></button><button class="field-card dune-field" data-field="dune-crown" aria-pressed="false"><strong>DUNE CROWN</strong><small>PYRAMIDS AT THE EDGE OF THE DESERT</small></button><button class="field-card rainforest-field" data-field="emerald-canopy" aria-pressed="false"><strong>EMERALD CANOPY</strong><small>TROPICAL RAINFOREST ARENA</small></button><button class="field-card coliseum-field" data-field="apex-coliseum" aria-pressed="false"><strong>APEX COLISEUM</strong><small>PLAY UNDER THE LIGHTS</small></button></div><footer class="screen-footer"><button id="fields-back" class="back-button">← MODES</button><button id="field-start" class="nav-button primary">START MATCH</button></footer></section>
     <section id="garage-screen" class="screen full-screen" hidden></section>
@@ -42,34 +42,10 @@ export class UI {
   }
   private packModeMenu() {
     const standard = document.querySelector<HTMLElement>(".standard-mode-grid")!,
-      extra = document.querySelector<HTMLElement>(".extra-mode-grid")!,
-      hub = document.createElement("div");
-    hub.className = "mode-hub-grid";
-    const sections = [
-      ["CASUAL MATCH", ["bot-mode", "heatseeker-mode"]],
-      ["RANKED", ["ranked-mode"]],
-      ["PRACTICE", ["freeplay-mode", "rings-mode"]],
-      ["TRAINING", ["training-packs-mode"]],
-    ] as const;
-    for (const [title, ids] of sections) {
-      const section = document.createElement("section"),
-        heading = document.createElement("h3"),
-        actions = document.createElement("div");
-      section.className = "mode-group";
-      heading.textContent = title;
-      actions.className = "mode-options";
-      for (const id of ids) {
-        const button = document.getElementById(id)!;
-        button.className = "mode-card mode-option";
-        actions.append(button);
-      }
-      section.append(heading, actions);
-      hub.append(section);
-    }
+      extra = document.querySelector<HTMLElement>(".extra-mode-grid")!;
     document.getElementById("friend-mode")?.remove();
-    document.querySelector<HTMLElement>(".mode-tabs")!.hidden = true;
-    standard.before(hub);
-    standard.hidden = true;
+    document.querySelector<HTMLElement>(".mode-tabs")!.hidden = false;
+    standard.hidden = false;
     extra.hidden = true;
   }
   on(id: string, fn: () => void) {
@@ -206,7 +182,7 @@ export class UI {
     };
     const home = m.phase === "home";
     document.getElementById("replay-prompt")!.hidden = !replaying;
-    const ringMode = m.mode === "rings";
+    const ringMode = ["rings", "dribbling-race", "solo-dribbling", "bot-ranked"].includes(m.mode);
     document.getElementById("pause-reset")!.hidden =
       !m.rules.training && !ringMode;
     document.getElementById("pause-reset")!.textContent = ringMode

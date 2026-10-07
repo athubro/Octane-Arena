@@ -112,7 +112,14 @@ async function boot() {
   scene.add(sun);
   const arena = drawArena(scene, settings.value.quality);
   let selectedField: ArenaField = "lumen",
-    pendingMode: "bot" | "heatseeker" | "freeplay" | "rings" = "bot",
+    pendingMode:
+      | "bot"
+      | "heatseeker"
+      | "freeplay"
+      | "rings"
+      | "dribbling-race"
+      | "solo-dribbling"
+      | "bot-ranked" = "bot",
     pendingTrainingPackId: string | null = null;
   const grassVelocities = simulation.cars.map(() => new T.Vector3());
   const ringCourse = new RingCourseView(scene, ringChallenge);
@@ -294,14 +301,26 @@ async function boot() {
   let rankedQueue = false,
     rankedSettled = false;
   const start = (
-    mode: "bot" | "heatseeker" | "freeplay" | "rings" = match.mode ===
-    "freeplay"
+    mode:
+      | "bot"
+      | "heatseeker"
+      | "freeplay"
+      | "rings"
+      | "dribbling-race"
+      | "solo-dribbling"
+      | "bot-ranked" = match.mode === "freeplay"
       ? "freeplay"
       : match.mode === "rings"
         ? "rings"
-        : match.mode === "heatseeker"
-          ? "heatseeker"
-          : "bot",
+        : match.mode === "dribbling-race"
+          ? "dribbling-race"
+          : match.mode === "solo-dribbling"
+            ? "solo-dribbling"
+            : match.mode === "bot-ranked"
+              ? "bot-ranked"
+              : match.mode === "heatseeker"
+                ? "heatseeker"
+                : "bot",
   ) => {
     trainingPackRun.stop();
     goalReplay.reset();
@@ -460,7 +479,16 @@ async function boot() {
   });
   ui.on("standard-modes-tab", () => ui.modeTab(false));
   ui.on("extra-modes-tab", () => ui.modeTab(true));
-  const chooseMode = (mode: "bot" | "heatseeker" | "freeplay" | "rings") => {
+  const chooseMode = (
+    mode:
+      | "bot"
+      | "heatseeker"
+      | "freeplay"
+      | "rings"
+      | "dribbling-race"
+      | "solo-dribbling"
+      | "bot-ranked",
+  ) => {
     pendingMode = mode;
     rankedQueue = false;
     document
@@ -506,6 +534,9 @@ async function boot() {
           : "bot";
     });
   ui.on("freeplay-mode", () => chooseMode("freeplay"));
+  ui.on("dribbling-race-mode", () => chooseMode("dribbling-race"));
+  ui.on("solo-dribbling-mode", () => chooseMode("solo-dribbling"));
+  ui.on("bot-ranked-mode", () => chooseMode("bot-ranked"));
   ui.on("training-packs-mode", () => {
     rankedQueue = false;
     ui.renderTrainingPacks(trainingPackRun.records);
