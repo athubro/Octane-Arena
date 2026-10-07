@@ -13,13 +13,49 @@ export class HomeLobby {
   group = new T.Group();
   private displays = new Map<string, Display>();
   private count = 1;
+  private yaw = 0;
+  private polar = 1.17;
+  private draggingPointer: number | null = null;
+  private pointerX = 0;
+  private pointerY = 0;
   area = document.createElement("div");
   labels = document.createElement("div");
+  private canvas = document.querySelector<HTMLCanvasElement>("#viewport canvas");
   constructor(scene: T.Scene) {
     scene.add(this.group);
     this.area.id = "home-car-area";
     this.labels.id = "lobby-labels";
     document.getElementById("app")!.append(this.area, this.labels);
+    this.canvas?.addEventListener("pointerdown", (event) => {
+      if (this.area.hidden || event.button !== 0) return;
+      this.draggingPointer = event.pointerId;
+      this.pointerX = event.clientX;
+      this.pointerY = event.clientY;
+      this.canvas!.setPointerCapture(event.pointerId);
+      this.canvas!.style.cursor = "grabbing";
+    });
+    this.canvas?.addEventListener("pointermove", (event) => {
+      if (event.pointerId !== this.draggingPointer) return;
+      if (event.pointerType === "mouse" && event.buttons === 0) {
+        this.stopDragging();
+        return;
+      }
+      this.yaw -= (event.clientX - this.pointerX) * 0.006;
+      this.polar = T.MathUtils.clamp(
+        this.polar + (event.clientY - this.pointerY) * 0.004,
+        0.48,
+        1.48,
+      );
+      this.pointerX = event.clientX;
+      this.pointerY = event.clientY;
+    });
+    const endDrag = (event: PointerEvent) => {
+      if (event.pointerId === this.draggingPointer) this.stopDragging();
+    };
+    this.canvas?.addEventListener("pointerup", endDrag);
+    this.canvas?.addEventListener("pointercancel", endDrag);
+    this.canvas?.addEventListener("lostpointercapture", endDrag);
+    window.addEventListener("blur", () => this.stopDragging());
   }
   update(
     members: PartyMember[],
@@ -31,6 +67,11 @@ export class HomeLobby {
     this.group.visible = visible;
     this.area.hidden = !visible;
     this.labels.hidden = !visible;
+    if (!visible) this.stopDragging();
+    if (this.canvas) {
+      this.canvas.style.cursor = visible ? "grab" : "default";
+      this.canvas.style.touchAction = visible ? "none" : "";
+    }
     if (!visible) return;
     const narrow = innerWidth < 760,
       columns = narrow ? Math.min(2, members.length) : members.length,
@@ -100,11 +141,13 @@ export class HomeLobby {
       spanY / (2 * halfTan * (rect.height / innerHeight)),
     );
     const target = new T.Vector3(6, 0.5, 14 + (rows - 1) * 1.15),
-      position = target
-        .clone()
-        .add(
-          new T.Vector3(Math.sin(time * 0.1) * 0.07, distance * 0.42, distance),
-        );
+      position = target.clone().add(
+        new T.Vector3(
+          Math.sin(this.yaw) * Math.sin(this.polar) * distance,
+          Math.cos(this.polar) * distance,
+          Math.cos(this.yaw) * Math.sin(this.polar) * distance,
+        ),
+      );
     camera.position.lerp(position, ease);
     camera.up.set(0, 1, 0);
     camera.lookAt(target);
@@ -145,5 +188,13 @@ export class HomeLobby {
         this.displays.delete(id);
       }
     }
+  }
+
+  private stopDragging() {
+    const pointer = this.draggingPointer;
+    this.draggingPointer = null;
+    if (pointer !== null && this.canvas?.hasPointerCapture(pointer))
+      this.canvas.releasePointerCapture(pointer);
+    if (this.canvas) this.canvas.style.cursor = "grab";
   }
 }
