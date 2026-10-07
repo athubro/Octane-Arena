@@ -69,6 +69,9 @@ export class Opponent {
   private aerialLaunchedAt = -Infinity;
   private aerialDoubleUsed = false;
   private heatseekerMode = false;
+  private approachSide = 0;
+  private wallRecoveryUntil = -Infinity;
+  private nextWallRecovery = 0;
   private stateHistory: OpponentTelemetry["history"] = [];
   telemetry: OpponentTelemetry = {
     ball: [0, 0, 0],
@@ -112,6 +115,9 @@ export class Opponent {
     this.directCommitUntil = 0;
     this.aerialLaunchedAt = -Infinity;
     this.aerialDoubleUsed = false;
+    this.approachSide = 0;
+    this.wallRecoveryUntil = -Infinity;
+    this.nextWallRecovery = 0;
     this.target.set(0, 0, 0);
     this.aerialPoint.set(0, 0, 0);
     this.stateHistory = [];
@@ -212,20 +218,23 @@ export class Opponent {
     if (!safeSide && currentBallDistance < 10) {
       // Go around the ball before lining up behind it. Driving straight to
       // the contact point from the goal side would hit it toward our own net.
+      // Hold the chosen side until the bot reaches the safe approach line.
       const sideX = -this.attack.z,
         sideZ = this.attack.x,
-        side =
+        requestedSide =
           (p.x - this.predictedBall.x) * sideX +
             (p.z - this.predictedBall.z) * sideZ >=
           0
             ? 1
             : -1;
+      if (this.approachSide === 0) this.approachSide = requestedSide;
+      const side = this.approachSide;
       this.target.set(
         this.predictedBall.x - this.attack.x * 1.8 + sideX * side * 3.4,
         0,
         this.predictedBall.z - this.attack.z * 1.8 + sideZ * side * 3.4,
       );
-    }
+    } else if (safeSide) this.approachSide = 0;
     if (directCommit) {
       this.target.set(
         this.predictedBall.x - this.attack.x * 1.35,
@@ -351,7 +360,6 @@ export class Opponent {
           this.aerialPoint.z - p.z,
         ),
         launchAerial =
-          aerialSkill > 0 &&
           hasAerialIntercept &&
           launchDistance < 3.8 + aerialSkill * 4.4 &&
           interceptTime > 0.25;
@@ -370,6 +378,37 @@ export class Opponent {
         c.jump = true;
         this.nextJump = time + 1.25 - skill * 0.3;
       }
+    }
+    const position = car.body.translation(),
+      nearXWall =
+        P.arena.halfWidth - Math.abs(position.x) < 4 &&
+        Math.abs(car.up.x) > 0.65 &&
+        Math.abs(car.up.y) < 0.65,
+      nearZWall =
+        P.arena.halfLength - Math.abs(position.z) < 4 &&
+        Math.abs(car.up.z) > 0.65 &&
+        Math.abs(car.up.y) < 0.65,
+      targetLeavesWall = nearXWall
+        ? Math.abs(this.target.x) < Math.abs(position.x) - 2
+        : nearZWall
+          ? Math.abs(this.target.z) < Math.abs(position.z) - 2
+          : false,
+      wallRecoveryActive = time < this.wallRecoveryUntil;
+    if (
+      car.grounded &&
+      targetLeavesWall &&
+      time >= this.nextWallRecovery
+    ) {
+      this.wallRecoveryUntil = time + 1.1;
+      this.nextWallRecovery = time + 2.2;
+      c.jump = true;
+    }
+    if (wallRecoveryActive && !car.grounded) {
+      const correction = car.up.clone().cross(new Vector3(0, 1, 0));
+      c.pitch = Math.max(-1, Math.min(1, -correction.dot(car.right) * 1.4));
+      c.roll = Math.max(-1, Math.min(1, correction.dot(car.forward) * 1.4));
+      c.yaw = 0;
+      c.boost = false;
     }
     const aerialAge = time - this.aerialLaunchedAt;
     if (aerialActive && aerialAge >= 0 && !car.grounded) {

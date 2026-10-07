@@ -67,6 +67,39 @@ assert.ok(
   brain.telemetry.predictedIntercept.some((v) => !Number.isNaN(v)),
   "planner exposes its selected predicted interception",
 );
+
+{
+  const car = simulation.cars[1],
+    approachBrain = new Opponent(),
+    ball = { x: 0, y: P.ball.radius, z: 0 };
+  approachBrain.level = 10;
+  car.reset(0.2, 1, Math.PI);
+  approachBrain.sample(car, ball, 2);
+  const firstTargetX = approachBrain.telemetry.desiredPosition[0];
+  car.reset(-0.2, 1, Math.PI);
+  approachBrain.sample(car, ball, 2 + P.dt);
+  assert.ok(firstTargetX > 0);
+  assert.ok(
+    approachBrain.telemetry.desiredPosition[0] > 0,
+    "small lateral movement must not switch the safe-side route around the ball",
+  );
+}
+
+{
+  const car = simulation.cars[1],
+    wallBrain = new Opponent();
+  wallBrain.level = 10;
+  car.reset(P.arena.halfWidth - 1, 0, Math.PI);
+  car.up.set(1, 0, 0);
+  car.grounded = true;
+  const input = wallBrain.sample(
+    car,
+    { x: 0, y: P.ball.radius, z: 0 },
+    3,
+  );
+  assert.ok(input.jump, "bot should detach from a wall when its target is inward");
+}
+
 simulation.dispose();
 console.log(
   `PASS predictive bot planning across ${scenarios.length} ball situations`,
