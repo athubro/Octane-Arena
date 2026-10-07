@@ -35,6 +35,7 @@ export class Car {
   forwardSpeed = 0;
   boosting = false;
   lastJump = false;
+  flipResetCount = 0;
   bodyId: BodyId = "ion";
   steerAngle = 0;
   handbrake = 0;
@@ -55,6 +56,12 @@ export class Car {
   setProRankedCpu(enabled: boolean) {
     this.proRankedCpu = enabled && this.controller === "bot";
     if (this.proRankedCpu) this.boost = 100;
+  }
+  grantFlipResetFromBall() {
+    if (!this.jump.used || this.jump.available) return false;
+    this.jump.grantFlipReset();
+    this.flipResetCount++;
+    return true;
   }
   get recovering() {
     return this.recovery > 0;
@@ -116,6 +123,7 @@ export class Car {
     this.wheelContact.fill(false);
     this.impactTime = 0;
     this.boosting = false;
+    this.flipResetCount = 0;
     this.body.setTranslation({ x, y, z }, true);
     this.body.setRotation(
       new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw),

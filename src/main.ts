@@ -461,6 +461,7 @@ async function boot() {
     document
       .getElementById("cpu-ranked-mode-control")!
       .toggleAttribute("hidden", true);
+    document.getElementById("ranked-options")!.toggleAttribute("hidden", true);
     ui.fields(true);
     document
       .querySelectorAll<HTMLButtonElement>("[data-field]")
@@ -479,6 +480,7 @@ async function boot() {
     chooseMode("bot");
     rankedQueue = true;
     document.getElementById("cpu-level-control")!.removeAttribute("hidden");
+    document.getElementById("ranked-options")!.removeAttribute("hidden");
     document
       .getElementById("cpu-ranked-mode-control")!
       .removeAttribute("hidden");

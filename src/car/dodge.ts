@@ -25,6 +25,15 @@ export class JumpState {
     this.flipLeft = 0;
     this.flipAge = Infinity;
   }
+  grantFlipReset() {
+    this.second = false;
+    this.age = 0;
+    this.held = 0;
+    this.flipLeft = 0;
+    this.flipAge = Infinity;
+    this.direction.set(0, 0, 0);
+    this.wasDown = true;
+  }
   step(
     input: Controls,
     grounded: boolean,

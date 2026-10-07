@@ -1,7 +1,25 @@
 import { P } from "../config/physics";
+import { Euler, Quaternion } from "three";
 import type { Simulation } from "../physics/simulation";
 import type { Match } from "./match";
 import { scoringTeam } from "./goals";
+
+type TrainingObjective = "goal" | "clear" | "counterattack";
+type TrainingScenario =
+  | "backboard-defense"
+  | "corner-defense"
+  | "last-man-save"
+  | "wall-clear"
+  | "awkward-aerial"
+  | "double-tap"
+  | "air-dribble"
+  | "flip-reset"
+  | "ground-possession"
+  | "redirect"
+  | "recovery"
+  | "ceiling-play"
+  | "low-boost"
+  | "counterattack";
 
 export interface TrainingShot {
   carX: number;
@@ -17,6 +35,21 @@ export interface TrainingShot {
   timer: number;
   cannon: boolean;
   aerial: boolean;
+  scenario: string;
+  instruction: string;
+  objective: TrainingObjective;
+  targetGoalX: number | null;
+  minimumTouches: number;
+  setupTouchRequired: boolean;
+  requireFlipReset: boolean;
+  requireRecoveryBeforeTouch: boolean;
+  requireRecoveryAfterTouch: boolean;
+  playerBoost: number;
+  carY: number;
+  carRoll: number;
+  carVX: number;
+  carVY: number;
+  carVZ: number;
 }
 
 export interface TrainingPack {
@@ -36,62 +69,106 @@ export interface TrainingPackRecord {
 export type TrainingPackRecords = Record<string, TrainingPackRecord>;
 
 const packNames = [
-  ["Rookie Warmup", "EASY", "Ground shots, gentle rolls, and wide open nets."],
-  ["First Touch", "EASY", "Side lanes and rolling touches introduce shot placement."],
-  ["Angle School", "CASUAL", "Turn awkward wide balls back toward the far post."],
-  ["Moving Targets", "CASUAL", "Read moving crosses, wall rolls, and rising balls."],
+  ["Rookie Reads", "EASY", "Gentle versions of real possessions, wall clears, and near-post reads."],
+  ["First Rotation", "EASY", "Catch bounces, clear the sidewall, and start a simple counter."],
+  ["Corner Pressure", "CASUAL", "Read corner rebounds and get the ball safely across the field."],
+  ["Last Defender", "CASUAL", "Far-post shots and backboard danger with room to recover."],
   [
-    "Aerial Class",
+    "Aerial Rescue",
     "INTERMEDIATE",
-    "Meet high crosses and redirect rebounds before they drop.",
+    "Backboard saves, awkward aerial touches, and fast goalmouth redirects.",
   ],
-  ["Crossbar Lab", "ADVANCED", "Clear the bar from high, off-center feeds."],
-  ["Wall Reads", "HARD", "Cannon feeds skim the wall and backboard at bad angles."],
+  ["Wall and Backboard", "ADVANCED", "Fast wall exits, ceiling drops, and deliberate second touches."],
+  ["Recovery Pressure", "HARD", "Land from awkward saves, then challenge with little boost and time."],
   [
-    "Air Control",
+    "Aerial Control",
     "VERY HARD",
-    "Fast aerial cannon shots arrive from the ceiling and sidewall.",
+    "Air dribbles, fast redirects, and controlled ceiling drops under pressure.",
   ],
   [
-    "Pressure Cooker",
+    "Counterattack Lab",
     "VERY HARD",
-    "Reverse-moving balls, corner rebounds, and narrow far-post lines.",
+    "Long recoveries, far-post saves, and short-window counterattacks.",
   ],
-  ["Overtime Trials", "PRO", "Obscure cannon setups: backboard clears, ceiling drops, and wall redirects."],
+  ["Overtime Trials", "PRO", "Flip resets, double taps, air dribbles, and defensive clears with pro-level timers."],
 ] as const;
 
-type ShotPattern =
-  | "ground"
-  | "roll"
-  | "diagonal"
-  | "wide"
-  | "pop"
-  | "wall-roll"
-  | "cross"
-  | "backboard"
-  | "corner"
-  | "drop"
-  | "reverse"
-  | "pinch"
-  | "ceiling"
-  | "wall-aerial"
-  | "crossbar";
-
-// Each pack has its own shot order and skill focus. Later packs deliberately
-// stop repeating the same centered setup: most of their feeds start high,
-// outside the goal mouth, or moving away from the target.
-const shotPlans: readonly (readonly ShotPattern[])[] = [
-  ["ground", "roll", "ground", "diagonal", "roll", "wide", "ground", "diagonal", "roll", "wide", "ground"],
-  ["roll", "wide", "diagonal", "pop", "ground", "wall-roll", "pop", "roll", "diagonal", "wide", "ground"],
-  ["wide", "wall-roll", "pop", "diagonal", "corner", "roll", "drop", "cross", "wall-roll", "diagonal", "cross"],
-  ["cross", "corner", "backboard", "wall-roll", "pop", "reverse", "wide", "cross", "corner", "backboard", "roll"],
-  ["reverse", "cross", "wall-aerial", "backboard", "corner", "drop", "wall-roll", "cross", "pop", "reverse", "wall-aerial"],
-  ["backboard", "wall-aerial", "ceiling", "corner", "reverse", "cross", "pinch", "crossbar", "drop", "backboard", "wall-aerial"],
-  ["wall-aerial", "backboard", "pinch", "ceiling", "corner", "reverse", "crossbar", "wall-aerial", "drop", "pinch", "backboard"],
-  ["ceiling", "pinch", "backboard", "wall-aerial", "crossbar", "reverse", "corner", "ceiling", "pinch", "drop", "wall-aerial"],
-  ["reverse", "backboard", "ceiling", "corner", "pinch", "crossbar", "wall-aerial", "reverse", "drop", "backboard", "ceiling"],
-  ["backboard", "ceiling", "wall-aerial", "pinch", "crossbar", "reverse", "corner", "backboard", "ceiling", "wall-aerial", "pinch"],
+const scenarioOrder: readonly TrainingScenario[] = [
+  "ground-possession",
+  "redirect",
+  "wall-clear",
+  "low-boost",
+  "corner-defense",
+  "backboard-defense",
+  "last-man-save",
+  "awkward-aerial",
+  "recovery",
+  "ceiling-play",
+  "counterattack",
+  "double-tap",
+  "air-dribble",
+  "flip-reset",
 ];
+const scenarioCountByPack = [4, 5, 6, 7, 8, 9, 10, 12, 14, 14];
+
+const scenarioCopy: Record<TrainingScenario, { title: string; task: string }> = {
+  "backboard-defense": {
+    title: "BACKBOARD DEFENSE",
+    task: "FAST AERIAL THE AWKWARD REBOUND · CLEAR IT · LAND TO RECOVER",
+  },
+  "corner-defense": {
+    title: "CORNER DEFENSE",
+    task: "READ THE HIGH CORNER BOUNCE · CLEAR TO THE OPPOSITE SIDE",
+  },
+  "last-man-save": {
+    title: "LAST-MAN SAVE",
+    task: "ROTATE BACK · SAVE THE FAR-POST SHOT WITH A SIDEWAYS AERIAL",
+  },
+  "wall-clear": {
+    title: "WALL CLEAR",
+    task: "JUMP OFF THE SIDEWALL · CLEAR HARD WHILE KEEPING MOMENTUM",
+  },
+  "awkward-aerial": {
+    title: "AWKWARD AERIAL",
+    task: "BALL IS BEHIND AND ABOVE · AIR-ROLL · MAKE A CONTROLLED TOUCH",
+  },
+  "double-tap": {
+    title: "DOUBLE TAP",
+    task: "USE THE FIRST TOUCH TO SET UP THE BACKBOARD · HIT IT AGAIN",
+  },
+  "air-dribble": {
+    title: "AIR DRIBBLE",
+    task: "WALL SETUP · CONTROL THREE TOUCHES · FINISH IN THE CALLED CORNER",
+  },
+  "flip-reset": {
+    title: "FLIP RESET",
+    task: "WALL-TO-AIR · GET THE WHEEL RESET · SHOOT BEFORE CONTROL RUNS OUT",
+  },
+  "ground-possession": {
+    title: "GROUND POSSESSION",
+    task: "CATCH THE FAST BOUNCE · DIAGONAL FLICK INTO THE CALLED CORNER",
+  },
+  redirect: {
+    title: "FAR-POST REDIRECT",
+    task: "REDIRECT THE FAST CROSS TO THE FAR POST · MINIMAL REACTION TIME",
+  },
+  recovery: {
+    title: "RECOVERY CHALLENGE",
+    task: "RECOVER FROM THE MISSED AERIAL · LAND · IMMEDIATELY CHALLENGE",
+  },
+  "ceiling-play": {
+    title: "CEILING PLAY",
+    task: "FAST AERIAL FROM THE CEILING DROP · CONTROL THE SHOT",
+  },
+  "low-boost": {
+    title: "LOW-BOOST PRESSURE",
+    task: "ONLY 20–30 BOOST · MAKE THE DEFENSIVE CLEAR OR CONTROLLED PLAY",
+  },
+  counterattack: {
+    title: "COUNTERATTACK",
+    task: "SAVE IS ALREADY MADE · RECOVER, COVER THE DISTANCE, FINISH FAST",
+  },
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -99,174 +176,229 @@ function clamp(value: number, min: number, max: number) {
 
 function makeShot(difficulty: number, index: number): TrainingShot {
   const pressure = difficulty / 9,
-    pattern = shotPlans[difficulty][index],
-    goalTeam = (difficulty + index) % 2,
-    goalSign = goalTeam === 0 ? -1 : 1,
-    edge = (index + difficulty) % 2 === 0 ? 1 : -1;
+    unlocked = scenarioCountByPack[difficulty],
+    scenario = scenarioOrder[(index * 11 + difficulty * 3) % unlocked],
+    copy = scenarioCopy[scenario],
+    edge = (index + difficulty) % 2 === 0 ? 1 : -1,
+    halfWidth = P.arena.halfWidth,
+    halfLength = P.arena.halfLength,
+    goalTeam = 0,
+    goalSign = -1;
   let ballX = edge * (4 + pressure * 3),
-    ballY = P.ball.radius,
-    distanceToGoal = 27 - pressure * 8,
+    ballY = P.ball.radius + 0.3,
+    ballZ = -(halfLength - (26 - pressure * 5)),
     ballVX = 0,
     ballVY = 0,
-    ballVZ = 0,
+    ballVZ = -2 - pressure * 2,
+    carX = 0,
+    carZ = 0,
+    targetGoalX: number | null = null,
+    objective: TrainingObjective = "goal",
+    minimumTouches = 1,
+    requireFlipReset = false,
+    requireRecoveryBeforeTouch = false,
+    requireRecoveryAfterTouch = false,
     cannon = false,
     aerial = false,
-    targetX = edge * (1 + pressure * 3);
+    playerBoost = 100,
+    carY = 0.36,
+    carRoll = 0,
+    carVX = 0,
+    carVY = 0,
+    carVZ = 0,
+    setupTouchRequired = false,
+    carYawOverride: number | null = null;
 
-  switch (pattern) {
-    case "ground":
-      ballX = ((index % 3) - 1) * (1 + pressure * 4);
-      distanceToGoal = 32 - pressure * 10;
+  switch (scenario) {
+    case "ground-possession":
+      ballX = edge * (4 + pressure * 4);
+      ballY = P.ball.radius + 0.8 + pressure * 0.25;
+      ballVY = 3 + pressure * 3.2;
+      ballVX = -edge * (1 + pressure * 2);
+      ballVZ = -2 - pressure * 3;
+      minimumTouches = 2;
+      targetGoalX = edge * (P.arena.goalHalf - 1.8);
       break;
-    case "roll":
-      ballX = edge * (5 + pressure * 6);
-      distanceToGoal = 25 - pressure * 7;
-      ballVX = -edge * (1.5 + pressure * 2.2);
-      ballVZ = goalSign * (1 + pressure * 1.8);
-      targetX = -edge * (1 + pressure * 3);
-      break;
-    case "diagonal":
-      ballX = edge * (9 + pressure * 11);
-      distanceToGoal = 22 - pressure * 6;
-      ballVX = -edge * (2 + pressure * 2.5);
-      ballVZ = goalSign * (1.5 + pressure * 2);
-      targetX = -edge * (2 + pressure * 4);
-      break;
-    case "wide":
-      ballX = edge * (21 + pressure * 12);
-      distanceToGoal = 19 - pressure * 5;
-      ballY = P.ball.radius + pressure * 1.2;
-      ballVX = -edge * (2.5 + pressure * 2.5);
-      ballVZ = goalSign * (1.2 + pressure * 2.4);
-      targetX = -edge * (1 + pressure * 4);
-      aerial = difficulty >= 6;
-      break;
-    case "pop":
-      ballX = edge * (3 + pressure * 7);
-      distanceToGoal = 22 - pressure * 6;
-      ballY = 2.4 + pressure * 3.5;
-      ballVY = 1.8 + pressure * 2.8;
-      ballVZ = goalSign * (1 + pressure * 1.5);
-      targetX = -edge * (1 + pressure * 3);
-      aerial = difficulty >= 2;
-      break;
-    case "wall-roll":
-      ballX = edge * (P.arena.halfWidth - 2.2);
-      distanceToGoal = 15 - pressure * 3;
-      ballY = P.ball.radius + 0.25 + pressure * 0.8;
-      ballVX = -edge * (0.8 + pressure * 1.8);
-      ballVZ = goalSign * (2 + pressure * 2);
-      targetX = edge * (1 + pressure * 2);
-      break;
-    case "cross":
-      ballX = edge * (13 + pressure * 7);
-      distanceToGoal = 18 - pressure * 4;
-      ballY = 4 + pressure * 3;
-      ballVX = -edge * (3 + pressure * 2.5);
-      ballVY = 1 + pressure * 2;
-      ballVZ = goalSign * (2 + pressure * 2.5);
-      targetX = -edge * (2 + pressure * 4);
+    case "redirect":
+      ballX = edge * (11 + pressure * 6);
+      ballY = 3.2 + pressure * 2.6;
+      ballZ = -(halfLength - 11 - pressure * 3);
+      ballVX = -edge * (10 + pressure * 8);
+      ballVY = 0.8 + pressure * 1.8;
+      ballVZ = -3 - pressure * 4;
+      targetGoalX = -edge * (P.arena.goalHalf - 1.8);
+      aerial = difficulty >= 3;
       cannon = difficulty >= 4;
-      aerial = true;
       break;
-    case "backboard":
-      // Outside the post, already near the back wall, and moving back out.
-      // The player must intercept it and redirect across the mouth.
-      ballX = edge * (P.arena.goalHalf + 2.2 + pressure * 2.8);
-      distanceToGoal = 3.5 + pressure * 2.5;
-      ballY = 4.2 + pressure * 4.5;
-      ballVX = -edge * (2.2 + pressure * 2.8);
-      ballVY = -0.8 - pressure * 1.5;
-      ballVZ = -goalSign * (1.8 + pressure * 2.5);
-      targetX = -edge * (2 + pressure * 4);
-      cannon = difficulty >= 5;
-      aerial = true;
-      break;
-    case "corner":
-      // A near-post feed starts outside the scoring frame and must be cut
-      // sharply back across the goal mouth.
-      ballX = edge * (P.arena.goalHalf + 4 + pressure * 3);
-      distanceToGoal = 4 + pressure * 3;
-      ballY = 1.5 + pressure * 2.3;
-      ballVX = -edge * (4 + pressure * 4);
-      ballVY = 0.5 + pressure * 1.5;
-      ballVZ = goalSign * (1.5 + pressure * 2.2);
-      targetX = -edge * (3 + pressure * 3);
+    case "wall-clear":
+      objective = "clear";
+      ballX = edge * (halfWidth - 2.6);
+      ballY = 2.1 + pressure * 5.2;
+      ballZ = 22 + pressure * 9;
+      ballVX = -edge * (1.1 + pressure * 2.3);
+      ballVY = 1.8 + pressure * 2.5;
+      ballVZ = 4 + pressure * 6;
+      aerial = difficulty >= 4;
       cannon = difficulty >= 6;
-      aerial = difficulty >= 5;
       break;
-    case "drop":
-      ballX = edge * (10 + pressure * 12);
-      distanceToGoal = 15 - pressure * 6;
-      ballY = 7 + pressure * 6;
-      ballVX = edge * (1 + pressure * 2);
-      ballVY = -1.2 - pressure * 1.8;
-      ballVZ = goalSign * (1.5 + pressure * 2);
-      targetX = -edge * (1 + pressure * 4);
+    case "low-boost":
+      playerBoost = 20 + ((index + difficulty) % 3) * 5;
+      if (index % 2 === 0) {
+        objective = "clear";
+        ballX = edge * (P.arena.goalHalf + 3 + pressure * 4);
+        ballY = 2.6 + pressure * 3.4;
+        ballZ = 26 + pressure * 8;
+        ballVX = -edge * (3 + pressure * 4);
+        ballVY = 1.5 + pressure * 2;
+        ballVZ = 7 + pressure * 7;
+        aerial = difficulty >= 5;
+        cannon = difficulty >= 6;
+      } else {
+        ballX = edge * (6 + pressure * 5);
+        ballY = P.ball.radius + 1.2;
+        ballZ = -(halfLength - 22);
+        ballVY = 2.2 + pressure * 2.3;
+        ballVZ = -3 - pressure * 2;
+        minimumTouches = 2;
+        targetGoalX = -edge * (P.arena.goalHalf - 2);
+      }
+      break;
+    case "corner-defense":
+      objective = "clear";
+      ballX = edge * (halfWidth - 5 - pressure * 1.5);
+      ballY = 6 + pressure * 3.5;
+      ballZ = 37 + pressure * 2;
+      ballVX = -edge * (5 + pressure * 7);
+      ballVY = 1.5 + pressure * 2;
+      ballVZ = -7 - pressure * 5;
+      aerial = true;
       cannon = difficulty >= 5;
+      break;
+    case "backboard-defense":
+      objective = "clear";
+      ballX = edge * (2.5 + pressure * 4);
+      ballY = P.arena.goalHeight + 2 + pressure * 2;
+      ballZ = halfLength + P.arena.goalDepth - 2;
+      ballVX = -edge * (6 + pressure * 4);
+      ballVY = -0.5 - pressure * 1.2;
+      ballVZ = -15 - pressure * 8;
       aerial = true;
+      cannon = difficulty >= 4;
+      requireRecoveryAfterTouch = true;
       break;
-    case "reverse":
-      // The ball travels away from the called goal, so a straight chase
-      // cannot score; the player has to beat it to a useful touch.
-      ballX = edge * (11 + pressure * 10);
-      distanceToGoal = 7 + pressure * 8;
-      ballY = 2.2 + pressure * 3.2;
-      ballVX = -edge * (3 + pressure * 4);
-      ballVY = -0.5 - pressure;
-      ballVZ = -goalSign * (2.2 + pressure * 3.2);
-      targetX = -edge * (2 + pressure * 4);
-      cannon = difficulty >= 6;
-      aerial = difficulty >= 5;
-      break;
-    case "pinch":
-      ballX = edge * (P.arena.halfWidth - 5.5);
-      distanceToGoal = 10 + pressure * 7;
-      ballY = 3.2 + pressure * 4.2;
-      ballVX = -edge * (5 + pressure * 3.5);
-      ballVY = 1 + pressure * 1.5;
-      ballVZ = goalSign * (4 + pressure * 2.5);
-      targetX = -edge * (3 + pressure * 3);
-      cannon = true;
+    case "last-man-save":
+      objective = "clear";
+      ballX = edge * (P.arena.goalHalf * 0.72);
+      ballY = 2.3 + pressure * 3;
+      ballZ = 18 + pressure * 4;
+      ballVX = -edge * (5 + pressure * 6);
+      ballVY = 1.5 + pressure * 2;
+      ballVZ = 10 + pressure * 8;
+      carX = -edge * (3 + pressure * 2);
+      carZ = 10 + pressure * 2;
+      carYawOverride = Math.PI + edge * 0.5;
+      carVX = edge * 1.5;
+      carVZ = 10 + pressure * 4;
       aerial = true;
+      cannon = difficulty >= 5;
       break;
-    case "ceiling":
-      ballX = edge * (12 + pressure * 10);
-      distanceToGoal = 5 + pressure * 8;
-      ballY = 11 + pressure * 5.5;
-      ballVX = -edge * (2 + pressure * 2.5);
-      ballVY = -2.2 - pressure * 1.5;
-      ballVZ = goalSign * (2.5 + pressure * 2.5);
-      targetX = -edge * (2 + pressure * 4);
-      cannon = true;
+    case "awkward-aerial":
+      ballX = edge * (8 + pressure * 9);
+      ballY = 8 + pressure * 4.5;
+      ballZ = -(halfLength - 17 - pressure * 5);
+      ballVX = -edge * (4 + pressure * 5);
+      ballVY = -1 - pressure * 1.8;
+      ballVZ = -4 - pressure * 5;
+      carX = ballX + edge * 2;
+      carZ = ballZ - 4.2;
+      carY = 2.4;
+      carRoll = edge * 0.85;
+      carVZ = -3.5;
+      carYawOverride = edge * 0.28;
       aerial = true;
+      cannon = difficulty >= 5;
       break;
-    case "wall-aerial":
-      ballX = edge * (P.arena.halfWidth - 4.2);
-      distanceToGoal = 9 + pressure * 10;
-      ballY = 5 + pressure * 5.5;
-      ballVX = -edge * (4 + pressure * 3.5);
-      ballVY = 1.8 + pressure * 2.2;
-      ballVZ = goalSign * (3 + pressure * 2.5);
-      targetX = -edge * (2 + pressure * 4);
-      cannon = true;
+    case "double-tap":
+      ballX = edge * (halfWidth - 7 - pressure * 2);
+      ballY = 4.5 + pressure * 3;
+      ballZ = -(halfLength - 21 - pressure * 4);
+      ballVX = -edge * (5 + pressure * 5);
+      ballVY = 2 + pressure * 2;
+      ballVZ = -8 - pressure * 7;
+      minimumTouches = 2;
+      setupTouchRequired = true;
+      targetGoalX = -edge * (P.arena.goalHalf - 2);
       aerial = true;
+      cannon = difficulty >= 5;
       break;
-    case "crossbar":
-      ballX = edge * (4 + pressure * 5);
-      distanceToGoal = 2.5 + pressure * 4.5;
-      ballY = 7.5 + pressure * 5;
+    case "air-dribble":
+      ballX = edge * (halfWidth - 4.5);
+      ballY = 3 + pressure * 1.8;
+      ballZ = -(halfLength - 28 - pressure * 5);
       ballVX = -edge * (2.5 + pressure * 3.5);
-      ballVY = -1.2 - pressure * 2;
-      ballVZ = goalSign * (1.5 + pressure * 3);
-      targetX = -edge * (2 + pressure * 3);
-      cannon = true;
+      ballVY = 2 + pressure * 1.8;
+      ballVZ = -4 - pressure * 5;
+      minimumTouches = 3;
+      targetGoalX = edge * (P.arena.goalHalf - 1.4);
       aerial = true;
+      cannon = difficulty >= 5;
+      break;
+    case "flip-reset":
+      ballX = edge * (halfWidth - 5.5);
+      ballY = 5 + pressure * 4;
+      ballZ = -(halfLength - 24 - pressure * 4);
+      ballVX = -edge * (4 + pressure * 4);
+      ballVY = -0.8 - pressure * 1.3;
+      ballVZ = -7 - pressure * 6;
+      minimumTouches = 2;
+      requireFlipReset = true;
+      aerial = true;
+      cannon = true;
+      break;
+    case "recovery":
+      ballX = -edge * (7 + pressure * 6);
+      ballY = 4 + pressure * 2.5;
+      ballZ = -(halfLength - 24 - pressure * 5);
+      ballVX = edge * (4 + pressure * 5);
+      ballVY = -1 - pressure;
+      ballVZ = -3 - pressure * 3;
+      carY = 2.1 + pressure * 1.2;
+      carRoll = edge * (0.8 + pressure * 0.25);
+      carVZ = -3 - pressure * 2;
+      requireRecoveryBeforeTouch = true;
+      aerial = true;
+      cannon = difficulty >= 6;
+      break;
+    case "ceiling-play":
+      ballX = edge * (8 + pressure * 8);
+      ballY = P.arena.height - P.ball.radius - 1.4;
+      ballZ = -(halfLength - 16 - pressure * 5);
+      ballVX = -edge * (3 + pressure * 4);
+      ballVY = -2 - pressure * 1.6;
+      ballVZ = -6 - pressure * 5;
+      aerial = true;
+      cannon = true;
+      break;
+    case "counterattack":
+      objective = "counterattack";
+      ballX = edge * (4 + pressure * 5);
+      ballY = 2.5 + pressure * 1.8;
+      ballZ = 13 + pressure * 5;
+      ballVX = -edge * (2 + pressure * 2);
+      ballVY = 0.4 + pressure;
+      ballVZ = -5.5 - pressure * 2.2;
+      playerBoost = 25;
+      carX = edge * (9 + pressure * 2);
+      carZ = ballZ + 15 + pressure * 1.5;
+      carY = 1.05;
+      carRoll = edge * 0.28;
+      carVZ = -11 - pressure * 2.5;
+      requireRecoveryBeforeTouch = true;
       break;
   }
 
-  const ballZ = goalSign * (P.arena.halfLength - distanceToGoal),
-    targetZ = goalSign * (P.arena.halfLength + P.arena.goalDepth * 0.65),
+  const targetX = targetGoalX ?? edge * (P.arena.goalHalf * 0.5),
+    targetZ = goalSign * (halfLength + P.arena.goalDepth * 0.65),
     aimX = targetX - ballX,
     aimZ = targetZ - ballZ,
     aimLength = Math.hypot(aimX, aimZ) || 1,
@@ -274,34 +406,42 @@ function makeShot(difficulty: number, index: number): TrainingShot {
     dirZ = aimZ / aimLength,
     sideX = -dirZ,
     sideZ = dirX,
-    startDistance = 8.5 + pressure * 2.5 + (cannon ? 1.2 : 0),
-    sideOffset =
-      ((index + difficulty) % 3 - 1) * (0.8 + pressure * 3.2),
+    startDistance =
+      scenario === "counterattack" ? 17 + pressure * 3 : 7.5 + pressure * 3,
+    sideOffset = ((index + difficulty) % 3 - 1) * (0.6 + pressure * 2.4);
+  if (
+    scenario !== "counterattack" &&
+    scenario !== "last-man-save" &&
+    scenario !== "awkward-aerial"
+  ) {
     carX = clamp(
       ballX - dirX * startDistance + sideX * sideOffset,
-      -P.arena.halfWidth + 3,
-      P.arena.halfWidth - 3,
-    ),
+      -halfWidth + 3,
+      halfWidth - 3,
+    );
     carZ = clamp(
       ballZ - dirZ * startDistance + sideZ * sideOffset,
-      -P.arena.halfLength + 4,
-      P.arena.halfLength - 4,
-    ),
+      -halfLength + 4,
+      halfLength - 4,
+    );
+  }
+  const carYaw = carYawOverride ?? Math.atan2(-dirX, -dirZ),
     timer = Math.round(
       Math.max(
-        5.8,
-        15.2 -
-          difficulty * 0.77 -
-          (cannon ? 1.2 : 0) -
-          (aerial ? 0.8 : 0) +
-          (index % 3) * 0.35,
+        scenario === "counterattack" ? 4.2 : 5.2,
+        12.2 -
+          difficulty * 0.68 -
+          (cannon ? 0.65 : 0) -
+          (aerial ? 0.45 : 0) -
+          Math.max(0, minimumTouches - 1) * 0.25 +
+          (index % 2) * 0.2,
       ) * 10,
     ) / 10;
 
   return {
     carX,
     carZ,
-    carYaw: Math.atan2(-dirX, -dirZ),
+    carYaw,
     ballX,
     ballY,
     ballZ,
@@ -310,8 +450,23 @@ function makeShot(difficulty: number, index: number): TrainingShot {
     ballVZ,
     goalTeam,
     timer,
-    cannon,
+    cannon: cannon || (difficulty >= 6 && aerial),
     aerial,
+    scenario: copy.title,
+    instruction: copy.task,
+    objective,
+    targetGoalX,
+    minimumTouches,
+    setupTouchRequired,
+    requireFlipReset,
+    requireRecoveryBeforeTouch,
+    requireRecoveryAfterTouch,
+    playerBoost,
+    carY,
+    carRoll,
+    carVX,
+    carVY,
+    carVZ,
   };
 }
 
@@ -387,6 +542,15 @@ export class TrainingPackRun {
   active = false;
   completed = false;
   message = "";
+  private lastObservedTouchSequence = 0;
+  private playerTouches = 0;
+  private qualifiedTouches = 0;
+  private playerHasRecovered = false;
+  private recoveredAfterTouch = false;
+  private clearReached = false;
+  private lastPlayerTouchAt = -Infinity;
+  private setupTouchCreated = false;
+  private setupBouncedFromBackboard = false;
 
   get pack() {
     return (
@@ -429,13 +593,95 @@ export class TrainingPackRun {
       return null;
     }
 
+    const shot = this.currentShot,
+      player = simulation.cars[0];
+    if (player.grounded) this.playerHasRecovered = true;
+    if (shot.setupTouchRequired && this.setupTouchCreated) {
+      const ball = simulation.ball.translation(),
+        velocity = simulation.ball.linvel();
+      if (
+        ball.z < -(P.arena.halfLength + 1.5) &&
+        velocity.z > 0.5
+      )
+        this.setupBouncedFromBackboard = true;
+    }
+    if (simulation.ballTouchSequence !== this.lastObservedTouchSequence) {
+      this.lastObservedTouchSequence = simulation.ballTouchSequence;
+      if (simulation.lastTouchId === player.id) {
+        this.playerTouches++;
+        this.lastPlayerTouchAt = simulation.clock;
+        const liftedSetup =
+            !shot.setupTouchRequired ||
+            this.setupTouchCreated ||
+            (this.playerTouches === 1 && simulation.ball.linvel().y > 1.2),
+          waitedForBackboard =
+            !shot.setupTouchRequired ||
+            this.playerTouches === 1 ||
+            this.setupBouncedFromBackboard;
+        if (
+          (!shot.requireRecoveryBeforeTouch || this.playerHasRecovered) &&
+          liftedSetup &&
+          waitedForBackboard
+        ) {
+          if (shot.setupTouchRequired && this.playerTouches === 1)
+            this.setupTouchCreated = true;
+          this.qualifiedTouches++;
+          this.message = this.qualifiedTouches < shot.minimumTouches
+            ? shot.setupTouchRequired && !this.setupBouncedFromBackboard
+              ? "FIRST TOUCH SET · PLAY THE BACKBOARD REBOUND"
+              : `TOUCH ${this.qualifiedTouches} · SET UP THE NEXT TOUCH`
+            : shot.requireFlipReset && player.flipResetCount === 0
+              ? "TOUCH REGISTERED · GET THE FLIP RESET"
+              : "TOUCH REGISTERED · FINISH THE PLAY";
+        } else if (shot.requireRecoveryBeforeTouch && !this.playerHasRecovered)
+          this.message = "RECOVER FIRST · THEN CHALLENGE";
+        else if (shot.setupTouchRequired && !liftedSetup)
+          this.message = "LIFT THE FIRST TOUCH TO THE BACKBOARD";
+        else this.message = "WAIT FOR THE BACKBOARD REBOUND · THEN TAP IT";
+      }
+    }
+    if (
+      shot.requireRecoveryAfterTouch &&
+      this.playerTouches > 0 &&
+      player.grounded &&
+      simulation.clock - this.lastPlayerTouchAt > 0.12
+    )
+      this.recoveredAfterTouch = true;
+
+    if (shot.objective !== "goal" && this.qualifiedTouches > 0) {
+      const ball = simulation.ball.translation(),
+        velocity = simulation.ball.linvel(),
+        crossedToAttackSide = ball.z < 0 && velocity.z < -4;
+      if (
+        crossedToAttackSide &&
+        (shot.objective !== "counterattack" || this.playerTouches > 0)
+      )
+        this.clearReached = true;
+      if (
+        this.clearReached &&
+        (!shot.requireRecoveryAfterTouch || this.recoveredAfterTouch)
+      ) {
+        this.score++;
+        this.message = shot.requireRecoveryAfterTouch
+          ? "CLEAR · RECOVERED · POINT"
+          : shot.objective === "counterattack"
+            ? "COUNTERATTACK · POINT"
+            : "CLEAR TO THE OPPOSITE SIDE · POINT";
+        return this.advance(match);
+      }
+    }
+
     if (match.phase === "goal") {
       const scored =
         !!match.goalFocus &&
         scoringTeam(match.goalFocus) === this.currentShot.goalTeam &&
-        simulation.lastTouchId === simulation.cars[0].id;
+        this.qualifiedTouches >= shot.minimumTouches &&
+        (!shot.requireFlipReset || player.flipResetCount > 0) &&
+        (!shot.requireRecoveryAfterTouch || this.recoveredAfterTouch) &&
+        (shot.targetGoalX === null ||
+          Math.abs(match.goalFocus.x - shot.targetGoalX) <= 2.8);
       if (scored) this.score++;
-      this.message = scored ? "GOAL · POINT" : "WRONG GOAL · NO POINT";
+      this.message = scored ? "CALLED SHOT · POINT" : "GOAL · TASK INCOMPLETE";
       return this.advance(match);
     }
 
@@ -471,6 +717,9 @@ export class TrainingPackRun {
       total: 11,
       score: this.score,
       goalTeam: shot.goalTeam,
+      objective: shot.objective,
+      scenario: shot.scenario,
+      instruction: shot.instruction,
       timer: this.timeLeft,
       timerLimit: this.timerLimit,
       cannon: shot.cannon,
@@ -519,8 +768,28 @@ export class TrainingPackRun {
     const shot = this.shot,
       car = simulation.cars[0];
     simulation.reset();
-    car.reset(shot.carX, shot.carZ, shot.carYaw);
-    car.boost = 100;
+    car.reset(shot.carX, shot.carZ, shot.carYaw, shot.carY);
+    car.body.setRotation(
+      new Quaternion().setFromEuler(
+        new Euler(0, shot.carYaw, shot.carRoll, "YXZ"),
+      ),
+      true,
+    );
+    car.body.setLinvel(
+      { x: shot.carVX, y: shot.carVY, z: shot.carVZ },
+      true,
+    );
+    car.pose.snap();
+    car.boost = shot.playerBoost;
+    this.lastObservedTouchSequence = simulation.ballTouchSequence;
+    this.playerTouches = 0;
+    this.qualifiedTouches = 0;
+    this.playerHasRecovered = car.grounded;
+    this.recoveredAfterTouch = false;
+    this.clearReached = false;
+    this.lastPlayerTouchAt = -Infinity;
+    this.setupTouchCreated = false;
+    this.setupBouncedFromBackboard = false;
     simulation.ball.setEnabled(true);
     simulation.ballCollider.setCollisionGroups(0xffffffff);
     simulation.ball.setTranslation(

@@ -75,6 +75,7 @@ export class Simulation {
     age: number;
   }[] = [];
   lastTouchId: string | null = null;
+  ballTouchSequence = 0;
   heatseekerEnabled = false;
   private heatseekerTargetTeam: number | null = null;
   private heatseekerTouches = 0;
@@ -174,6 +175,7 @@ export class Simulation {
     }
     this.demolitions = [];
     this.lastTouchId = null;
+    this.ballTouchSequence = 0;
     this.heatseekerTargetTeam = null;
     this.heatseekerTouches = 0;
     this.ballCollider.setCollisionGroups(0xffffffff);
@@ -235,6 +237,7 @@ export class Simulation {
   applyNetworkSnapshot(snapshot: MatchSnapshot) {
     this.clock = snapshot.clock;
     this.lastTouchId = snapshot.lastTouchId;
+    this.ballTouchSequence = 0;
     const ball = snapshot.ball;
     this.ballPose.before();
     this.ball.setEnabled(ball.enabled);
@@ -423,7 +426,15 @@ export class Simulation {
         (c) => c.collider.handle === (a === this.ballCollider.handle ? b : a),
       );
       if (carIndex >= 0) {
-        this.lastTouchId = this.cars[carIndex].id;
+        const car = this.cars[carIndex],
+          carFromBall = new Vector3()
+            .subVectors(car.body.translation(), this.ball.translation())
+            .normalize();
+        this.lastTouchId = car.id;
+        this.ballTouchSequence++;
+        // Approximate the four-wheel contact needed for a Rocket League-style
+        // flip reset: a spent jump returns only when the car's wheels face ball.
+        if (car.up.dot(carFromBall) > 0.62) car.grantFlipResetFromBall();
         this.strike(carIndex);
       } else {
         const speed = new Vector3()
