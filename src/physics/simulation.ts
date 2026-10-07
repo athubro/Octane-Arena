@@ -79,6 +79,7 @@ export class Simulation {
   heatseekerEnabled = false;
   private heatseekerTargetTeam: number | null = null;
   private heatseekerTouches = 0;
+  private heatseekerTarget = new Vector3();
   private velocities: Vector3[] = [];
   private cooldown: number[] = [];
   private relative: Vector3[] = [];
@@ -636,25 +637,28 @@ export class Simulation {
         const velocity = new Vector3().copy(this.ball.linvel());
         this.ball.setLinvel(velocity.normalize().multiplyScalar(38), true);
       }
-    } else if (c.isProRankedCpu) {
-      // Level ten has a reliable finishing touch: after a real, closing
-      // collision, send the ball through the center of the opposing goal.
-      const goalZ =
-          (c.team === 0 ? -1 : 1) *
-          (P.arena.halfLength + P.arena.goalDepth - 1.2),
-        shot = new Vector3(0, 2.6, goalZ).sub(this.ball.translation());
-      this.ball.setLinvel(shot.normalize().multiplyScalar(38), true);
     }
   }
   private launchHeatseekerBall(team: number) {
     this.heatseekerTargetTeam = team;
     this.heatseekerTouches++;
-    const targetZ =
-        (team === 0 ? -1 : 1) *
+    const aimPoints = [
+      [-2.8, 5.3],
+      [2.8, 6.2],
+      [0, 7.2],
+      [-1.8, 6.6],
+      [1.8, 5.8],
+    ];
+    const [targetX, targetY] = aimPoints[(this.heatseekerTouches - 1) % aimPoints.length];
+    this.heatseekerTarget.set(
+      targetX,
+      targetY,
+      (team === 0 ? -1 : 1) *
         (P.arena.halfLength + P.arena.goalDepth - 1.2),
-      // Aim well above the floor so each redirected shot visibly lifts into
-      // the goal instead of skimming along the turf.
-      direction = new Vector3(0, 4.2, targetZ).sub(this.ball.translation());
+    );
+    const direction = this.heatseekerTarget
+      .clone()
+      .sub(this.ball.translation());
     if (direction.lengthSq() < 1e-8)
       direction.set(0, 0, team === 0 ? -1 : 1);
     const speed = Math.min(42, 22 + (this.heatseekerTouches - 1) * 2.2);
@@ -663,17 +667,18 @@ export class Simulation {
   private steerHeatseekerBall() {
     if (!this.heatseekerEnabled || this.heatseekerTargetTeam === null) return;
     const position = this.ball.translation(),
-      targetZ =
-        (this.heatseekerTargetTeam === 0 ? -1 : 1) *
-        (P.arena.halfLength + P.arena.goalDepth - 1.2),
-      desired = new Vector3(0, 4.2, targetZ).sub(position),
+      desired = this.heatseekerTarget.clone().sub(position),
       velocity = new Vector3().copy(this.ball.linvel()),
       speed = velocity.length();
     if (speed < 1e-4 || desired.lengthSq() < 1e-8) return;
-    // A small deterministic steering step curves the ball toward the called
-    // goal after a sidewall rebound without changing its speed.
-    velocity.normalize().lerp(desired.normalize(), 0.018).normalize();
-    this.ball.setLinvel(velocity.multiplyScalar(speed), true);
+    // Rallies build speed while the deterministic steering keeps each shot
+    // moving toward its varied, elevated point in the called goal.
+    velocity
+      .normalize()
+      .lerp(desired.normalize(), 0.018)
+      .normalize()
+      .multiplyScalar(Math.min(52, speed + 2.4 * P.dt));
+    this.ball.setLinvel(velocity, true);
   }
   private bump(first: number, second: number) {
     const a = this.cars[first],
