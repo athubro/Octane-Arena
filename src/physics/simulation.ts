@@ -437,6 +437,20 @@ export class Simulation {
         if (car.up.dot(carFromBall) > 0.62) car.grantFlipResetFromBall();
         this.strike(carIndex);
       } else {
+        if (this.heatseekerEnabled && this.heatseekerTargetTeam !== null) {
+          const colliderHandle = a === this.ballCollider.handle ? b : a,
+            position = this.ball.translation(),
+            backPlane = P.arena.halfLength + P.arena.goalDepth;
+          // The two goal shells are the final arena colliders. Only their
+          // rear panel sends a Heatseeker shot back across the field.
+          if (
+            (colliderHandle === this.arenaColliders[3].handle ||
+              colliderHandle === this.arenaColliders[4].handle) &&
+            Math.abs(position.z) >= backPlane - P.ball.radius * 1.5 &&
+            Math.abs(position.x) <= P.arena.goalHalf - 0.5
+          )
+            this.launchHeatseekerBall(1 - this.heatseekerTargetTeam);
+        }
         const speed = new Vector3()
           .subVectors(
             this.ball.linvel(),
@@ -638,7 +652,9 @@ export class Simulation {
     const targetZ =
         (team === 0 ? -1 : 1) *
         (P.arena.halfLength + P.arena.goalDepth - 1.2),
-      direction = new Vector3(0, 2.1, targetZ).sub(this.ball.translation());
+      // Aim well above the floor so each redirected shot visibly lifts into
+      // the goal instead of skimming along the turf.
+      direction = new Vector3(0, 4.2, targetZ).sub(this.ball.translation());
     if (direction.lengthSq() < 1e-8)
       direction.set(0, 0, team === 0 ? -1 : 1);
     const speed = Math.min(42, 22 + (this.heatseekerTouches - 1) * 2.2);
@@ -650,7 +666,7 @@ export class Simulation {
       targetZ =
         (this.heatseekerTargetTeam === 0 ? -1 : 1) *
         (P.arena.halfLength + P.arena.goalDepth - 1.2),
-      desired = new Vector3(0, 2.1, targetZ).sub(position),
+      desired = new Vector3(0, 4.2, targetZ).sub(position),
       velocity = new Vector3().copy(this.ball.linvel()),
       speed = velocity.length();
     if (speed < 1e-4 || desired.lengthSq() < 1e-8) return;
