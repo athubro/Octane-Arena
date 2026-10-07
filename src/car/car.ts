@@ -291,11 +291,11 @@ export class Car {
       this.stuckTime >= c.stuckTime &&
       this.recoveryCooldown === 0
     ) {
-      this.recovery = 0.4;
+      // A forced roll can pin the chassis into rounded wall transitions.
+      // Nudge it off the contacted surface and leave steering/jump control live.
+      this.v.addScaledVector(sideSupport, 2.5);
+      this.v.addScaledVector(this.forward, 0.8);
       this.recoveryCooldown = c.recoveryCooldown;
-      this.recoverySide =
-        Math.sign(this.up.clone().cross(sideSupport).dot(this.forward)) || 1;
-      this.v.addScaledVector(sideSupport, 1.5);
       this.stuckTime = 0;
     }
     this.contactGap = this.contacts ? 0 : this.contactGap + dt;

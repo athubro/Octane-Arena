@@ -7,13 +7,15 @@ export interface ArenaMesh {
 /** Original rounded-rectangle sweep. Shared by rendering and collision, never extracted geometry. */
 export function arenaShell(): ArenaMesh {
   const a = P.arena,
+    cornerSegments = 48,
+    rampSegments = 28,
     perimeter: { x: number; z: number; nx: number; nz: number }[] = [];
   for (let corner = 0; corner < 4; corner++) {
     const angle0 = (corner * Math.PI) / 2,
       cx = (corner === 0 || corner === 3 ? 1 : -1) * (a.halfWidth - a.corner),
       cz = (corner < 2 ? 1 : -1) * (a.halfLength - a.corner);
-    for (let k = 0; k <= 24; k++) {
-      const t = angle0 + ((k / 24) * Math.PI) / 2;
+    for (let k = 0; k <= cornerSegments; k++) {
+      const t = angle0 + ((k / cornerSegments) * Math.PI) / 2;
       perimeter.push({
         x: cx + a.corner * Math.cos(t),
         z: cz + a.corner * Math.sin(t),
@@ -30,13 +32,13 @@ export function arenaShell(): ArenaMesh {
         perimeter.push({ x, z: -a.halfLength, nx: 0, nz: -1 });
   }
   const profile: [number, number][] = [];
-  for (let i = 0; i <= 20; i++) {
-    const t = ((i / 20) * Math.PI) / 2;
+  for (let i = 0; i <= rampSegments; i++) {
+    const t = ((i / rampSegments) * Math.PI) / 2;
     profile.push([a.ramp * (1 - Math.sin(t)), a.ramp * (1 - Math.cos(t))]);
   }
   profile.push([0, a.goalHeight + a.goalLip], [0, a.height - a.ramp]);
-  for (let i = 1; i <= 20; i++) {
-    const t = ((i / 20) * Math.PI) / 2;
+  for (let i = 1; i <= rampSegments; i++) {
+    const t = ((i / rampSegments) * Math.PI) / 2;
     profile.push([
       a.ramp * (1 - Math.cos(t)),
       a.height - a.ramp + a.ramp * Math.sin(t),

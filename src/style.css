@@ -1673,7 +1673,9 @@ output {
 }
 #training-pack-hud header b { font-size: 18px; }
 #training-pack-tier,
-#training-pack-cannon { color: #ffd387; font-size: 11px; letter-spacing: .12em; }
+#training-pack-cannon,
+#training-pack-aerial { color: #ffd387; font-size: 11px; letter-spacing: .12em; }
+#training-pack-aerial { color: #8de9ff; }
 .training-pack-hud-row { margin-top: 3px; }
 #training-pack-shot { color: #bcecf2; font-size: 13px; letter-spacing: .1em; }
 #training-pack-target { color: #fff0bd; font-size: 11px; letter-spacing: .08em; }

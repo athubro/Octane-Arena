@@ -16,6 +16,7 @@ export interface TrainingShot {
   goalTeam: number;
   timer: number;
   cannon: boolean;
+  aerial: boolean;
 }
 
 export interface TrainingPack {
@@ -109,6 +110,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
     ballVY = 0,
     ballVZ = 0,
     cannon = false,
+    aerial = false,
     targetX = edge * (1 + pressure * 3);
 
   switch (pattern) {
@@ -137,6 +139,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVX = -edge * (2.5 + pressure * 2.5);
       ballVZ = goalSign * (1.2 + pressure * 2.4);
       targetX = -edge * (1 + pressure * 4);
+      aerial = difficulty >= 6;
       break;
     case "pop":
       ballX = edge * (3 + pressure * 7);
@@ -145,6 +148,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVY = 1.8 + pressure * 2.8;
       ballVZ = goalSign * (1 + pressure * 1.5);
       targetX = -edge * (1 + pressure * 3);
+      aerial = difficulty >= 2;
       break;
     case "wall-roll":
       ballX = edge * (P.arena.halfWidth - 2.2);
@@ -163,6 +167,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVZ = goalSign * (2 + pressure * 2.5);
       targetX = -edge * (2 + pressure * 4);
       cannon = difficulty >= 4;
+      aerial = true;
       break;
     case "backboard":
       // Outside the post, already near the back wall, and moving back out.
@@ -175,6 +180,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVZ = -goalSign * (1.8 + pressure * 2.5);
       targetX = -edge * (2 + pressure * 4);
       cannon = difficulty >= 5;
+      aerial = true;
       break;
     case "corner":
       // A near-post feed starts outside the scoring frame and must be cut
@@ -187,6 +193,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVZ = goalSign * (1.5 + pressure * 2.2);
       targetX = -edge * (3 + pressure * 3);
       cannon = difficulty >= 6;
+      aerial = difficulty >= 5;
       break;
     case "drop":
       ballX = edge * (10 + pressure * 12);
@@ -197,6 +204,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVZ = goalSign * (1.5 + pressure * 2);
       targetX = -edge * (1 + pressure * 4);
       cannon = difficulty >= 5;
+      aerial = true;
       break;
     case "reverse":
       // The ball travels away from the called goal, so a straight chase
@@ -209,6 +217,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVZ = -goalSign * (2.2 + pressure * 3.2);
       targetX = -edge * (2 + pressure * 4);
       cannon = difficulty >= 6;
+      aerial = difficulty >= 5;
       break;
     case "pinch":
       ballX = edge * (P.arena.halfWidth - 5.5);
@@ -219,6 +228,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVZ = goalSign * (4 + pressure * 2.5);
       targetX = -edge * (3 + pressure * 3);
       cannon = true;
+      aerial = true;
       break;
     case "ceiling":
       ballX = edge * (12 + pressure * 10);
@@ -229,6 +239,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVZ = goalSign * (2.5 + pressure * 2.5);
       targetX = -edge * (2 + pressure * 4);
       cannon = true;
+      aerial = true;
       break;
     case "wall-aerial":
       ballX = edge * (P.arena.halfWidth - 4.2);
@@ -239,6 +250,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVZ = goalSign * (3 + pressure * 2.5);
       targetX = -edge * (2 + pressure * 4);
       cannon = true;
+      aerial = true;
       break;
     case "crossbar":
       ballX = edge * (4 + pressure * 5);
@@ -249,6 +261,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
       ballVZ = goalSign * (1.5 + pressure * 3);
       targetX = -edge * (2 + pressure * 3);
       cannon = true;
+      aerial = true;
       break;
   }
 
@@ -276,8 +289,12 @@ function makeShot(difficulty: number, index: number): TrainingShot {
     ),
     timer = Math.round(
       Math.max(
-        6.2,
-        18.5 - difficulty * 0.93 - (cannon ? 1.3 : 0) + (index % 3) * 0.55,
+        5.8,
+        15.2 -
+          difficulty * 0.77 -
+          (cannon ? 1.2 : 0) -
+          (aerial ? 0.8 : 0) +
+          (index % 3) * 0.35,
       ) * 10,
     ) / 10;
 
@@ -294,6 +311,7 @@ function makeShot(difficulty: number, index: number): TrainingShot {
     goalTeam,
     timer,
     cannon,
+    aerial,
   };
 }
 
@@ -456,6 +474,7 @@ export class TrainingPackRun {
       timer: this.timeLeft,
       timerLimit: this.timerLimit,
       cannon: shot.cannon,
+      aerial: shot.aerial,
       message: this.message,
       best: this.packId ? this.records[this.packId]?.best : undefined,
       last: this.packId ? this.records[this.packId]?.last : undefined,

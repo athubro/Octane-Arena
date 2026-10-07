@@ -38,7 +38,9 @@ export function createArena(world: RAPIER.World, flat = false) {
         shell.indices,
         RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES,
       )
-        .setFriction(0.3)
+        // Wheel traction is handled by the car controller. Lower shell
+        // friction lets the chassis slide across rounded wall seams cleanly.
+        .setFriction(0.08)
         .setRestitution(0)
         .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max),
     ),
@@ -53,7 +55,7 @@ export function createArena(world: RAPIER.World, flat = false) {
           goal.indices,
           RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES,
         )
-          .setFriction(0.3)
+          .setFriction(0.08)
           .setRestitution(0)
           .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max),
       ),
