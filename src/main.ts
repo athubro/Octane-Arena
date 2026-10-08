@@ -1358,6 +1358,11 @@ async function boot() {
       ringChallenge.streak + 1,
       ringChallenge.count,
     );
+    ui.updateDribblingChallenge(
+      dribblingChallenge.level + 1,
+      dribblingChallenge.levelCount,
+      dribblingChallenge.best,
+    );
     const again = document.getElementById("again") as HTMLButtonElement;
     again.disabled =
       match.mode === "party" && party.state?.hostId !== party.playerId;

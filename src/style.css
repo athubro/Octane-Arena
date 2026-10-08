@@ -2012,6 +2012,39 @@ output {
 .mode-card:hover:not(:disabled) {
   background: linear-gradient(145deg, #376078, #1c3645);
 }
+#ring-score.dribble-score {
+  top: 14px;
+  left: 25px;
+  transform: none;
+  min-width: 240px;
+  justify-items: start;
+  padding: 12px 18px;
+  border-left: 3px solid #ffbe68;
+  border-top: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 84%, 92% 100%, 0 100%);
+  text-shadow: none;
+}
+#ring-score.dribble-score #ring-title {
+  color: #c8d9df;
+  font-size: 11px;
+  letter-spacing: .12em;
+  order: 0;
+}
+#ring-score.dribble-score #ring-streak {
+  color: #f2fbff;
+  font-size: 32px;
+  line-height: 1.05;
+  order: 1;
+}
+#ring-score.dribble-score #ring-best {
+  margin-top: 4px;
+  color: #c8d9df;
+  font-size: 15px;
+  order: 2;
+}
+#ring-score.dribble-score #ring-next {
+  display: none;
+}
 #training-pack-select {
   background: linear-gradient(105deg, #101d2df2 0%, #122731dc 62%, #0e3b37bd 100%);
 }
