@@ -535,7 +535,8 @@ export class Simulation {
       c.pose.after();
     });
     this.ballPose.after();
-    if (!this.ringCourseEnabled && !this.flatArena) this.recoverEscapedBodies();
+    if (this.ringCourseEnabled) this.recoverRingEscape();
+    else if (!this.flatArena) this.recoverEscapedBodies();
   }
   private recoverRingEscape() {
     for (const car of this.cars) {
@@ -547,7 +548,7 @@ export class Simulation {
       // larger margin accounts for the car body before it can cross a rail.
       if (
         Math.abs(p.x) <= 11.1 &&
-        p.z >= -96.9 &&
+        p.z >= (this.dribbleCourseEnabled ? -129.9 : -96.9) &&
         p.z <= 56.9 &&
         p.y >= -1.5 &&
         p.y <= 35

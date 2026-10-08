@@ -37,8 +37,8 @@ export class RingMap {
 
   setVisible(visible: boolean) {
     this.group.visible = visible;
-    this.scene.background = visible ? new T.Color(0x79bde1) : this.background;
-    this.scene.fog = visible ? new T.Fog(0x9bcde3, 150, 420) : this.fog;
+    this.scene.background = visible ? new T.Color(0x05090e) : this.background;
+    this.scene.fog = visible ? new T.Fog(0x07111a, 155, 420) : this.fog;
   }
 
   private addClouds() {
@@ -89,12 +89,12 @@ export class RingMap {
 
     for (let y = 0; y < 8; y++) {
       for (let x = 0; x < 8; x++) {
-        checkerCtx.fillStyle = (x + y) % 2 === 0 ? "#d4f1ff" : "#7abbd8";
+        checkerCtx.fillStyle = (x + y) % 2 === 0 ? "#327b7c" : "#245c64";
         checkerCtx.fillRect(x * square, y * square, square, square);
       }
     }
-    checkerCtx.strokeStyle = "rgba(255,255,255,0.58)";
-    checkerCtx.lineWidth = 3;
+    checkerCtx.strokeStyle = "rgba(135,231,220,0.42)";
+    checkerCtx.lineWidth = 2;
     for (let i = 0; i <= 8; i++) {
       checkerCtx.beginPath();
       checkerCtx.moveTo(i * square, 0);
@@ -116,7 +116,7 @@ export class RingMap {
       new T.PlaneGeometry(22, 190),
       new T.MeshStandardMaterial({
         map: gridTexture,
-        color: 0xcaf0ff,
+        color: 0xa9dfd5,
         roughness: 0.88,
         metalness: 0.12,
       }),

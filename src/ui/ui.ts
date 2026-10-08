@@ -23,6 +23,7 @@ export class UI {
     <div id="hud" hidden><div class="scoreboard"><span id="score-cyan">0</span><time id="clock">5:00</time><span id="score-amber">0</span></div><div id="ring-score" hidden><strong id="ring-streak">0</strong><span>RING STREAK</span><b id="ring-best">BEST 0</b><small id="ring-next">RING 1 / 9</small></div><section id="training-pack-hud" hidden><header><b id="training-pack-title"></b><span id="training-pack-tier"></span></header><div class="training-pack-hud-row"><strong id="training-pack-shot">SHOT 01 / 11</strong><span id="training-pack-target"></span><span id="training-pack-aerial" hidden>↑ AERIAL</span><span id="training-pack-cannon" hidden>◆ CANNON</span></div><small id="training-pack-task"></small><div class="training-pack-timer"><i id="training-pack-timer-fill"></i></div><div class="training-pack-hud-row"><span id="training-pack-points">0 POINTS</span><time id="training-pack-time">0.0</time></div><small id="training-pack-message" aria-live="polite"></small></section><div id="notice" aria-live="polite"></div><div id="replay-prompt" hidden>GOAL REPLAY · PRESS X TO SKIP</div><div id="countdown" aria-live="polite"></div><div class="camera-status"><i></i><b id="camera-mode">BALL CAMERA</b></div><div class="boost-hud"><svg viewBox="0 0 160 160" aria-hidden="true"><path class="boost-track" d="M128 128 A68 68 0 1 0 32 128" pathLength="100"/><path id="boost-fill" d="M32 128 A68 68 0 1 1 128 128" pathLength="100"/></svg><div id="boost">100</div><div id="boost-label">BOOST</div></div><div id="bot-tag" hidden></div></div>
     <section id="pause" class="modal" hidden><div class="modal-card"><h2>PAUSED</h2><button id="resume" class="nav-button primary">RESUME</button><button id="pause-settings" class="nav-button">SETTINGS</button><button id="pause-controls" class="nav-button">CONTROLS</button><button id="pause-reset" class="nav-button">RESET</button><button id="pause-home" class="nav-button">LEAVE MATCH</button></div></section>
     <section id="result" class="modal" hidden><div class="modal-card"><h2 id="result-title"></h2><p id="result-score"></p><button id="again" class="nav-button primary">PLAY AGAIN</button><button id="home" class="nav-button">HOME</button></div></section><dialog id="settings"></dialog><dialog id="account" aria-label="Account"></dialog><pre id="debug" hidden></pre>`;
+    this.configureModeCards();
     const rankedModeControl = document.createElement("label");
     rankedModeControl.id = "cpu-ranked-mode-control";
     rankedModeControl.className = "cpu-level-control";
@@ -38,6 +39,28 @@ export class UI {
       document.getElementById("cpu-level-control")!,
     );
     document.querySelector("#fields .field-grid")!.before(rankedOptions);
+  }
+  private configureModeCards() {
+    const standard = document.querySelector<HTMLElement>(".standard-mode-grid")!,
+      extra = document.querySelector<HTMLElement>(".extra-mode-grid")!,
+      friend = standard.querySelector<HTMLButtonElement>("button:disabled")!;
+    const extraCard = document.createElement("button");
+    extraCard.id = "extra-modes-mode";
+    extraCard.className = "mode-card";
+    extraCard.innerHTML = `${icon("ranked")}<strong>EXTRA MODES</strong>`;
+    extraCard.addEventListener("click", () => this.modeTab(true));
+    standard.replaceChildren(
+      document.getElementById("bot-mode")!,
+      document.getElementById("freeplay-mode")!,
+      friend,
+      extraCard,
+    );
+    const training = document.getElementById("training-packs-mode")!,
+      rings = document.getElementById("rings-mode")!,
+      dribble = document.getElementById("solo-dribbling-mode")!;
+    dribble.innerHTML = `<span class="rings-mode-icon" aria-hidden="true">${icon("freeplay")}</span><strong>DRIBBLE CHALLENGE</strong>`;
+    extra.replaceChildren(training, rings, dribble);
+    document.querySelector<HTMLElement>(".mode-tabs")!.hidden = true;
   }
   private packModeMenu() {
     const standard = document.querySelector<HTMLElement>(".standard-mode-grid")!,
@@ -67,6 +90,9 @@ export class UI {
     document
       .getElementById("extra-modes-tab")
       ?.setAttribute("aria-pressed", String(extra));
+    document.querySelector<HTMLElement>(".mode-tabs")!.hidden = true;
+    document.querySelector<HTMLElement>("#modes > h2")!.textContent =
+      extra ? "EXTRA MODES" : "PLAY";
   }
   fields(show: boolean) {
     this.screen = show ? "fields" : "modes";
@@ -77,12 +103,16 @@ export class UI {
   renderTrainingPacks(records: TrainingPackRecords) {
     const list = document.getElementById("training-pack-list");
     if (!list) return;
-    list.innerHTML = TRAINING_PACKS.map((pack, index) => {
+    const choices = [
+      { id: "training-01", name: "STRIKER", detail: "SHOTS AND APPROACHES", symbol: "freeplay" },
+      { id: "training-04", name: "GOALIE", detail: "SAVES FROM DIFFERENT ANGLES", symbol: "ranked" },
+      { id: "training-05", name: "AERIAL", detail: "HIT AIRBORNE BALLS", symbol: "boost" },
+    ];
+    list.innerHTML = choices.map((choice) => {
+      const pack = TRAINING_PACKS.find((candidate) => candidate.id === choice.id)!;
       const record = records[pack.id],
-        score = record
-          ? `BEST ${record.best}/11 · LAST ${record.last}/11`
-          : "NOT PLAYED";
-      return `<button class="training-pack-card" data-training-pack="${pack.id}"><span class="training-pack-number">PACK ${String(index + 1).padStart(2, "0")}</span><span class="training-pack-tier">${pack.tier}</span><strong>${pack.name}</strong><small>${pack.description}</small><b>${score}</b><i>11 SHOTS ↗</i></button>`;
+        score = record ? `BEST ${record.best}/11` : "NOT PLAYED";
+      return `<button class="training-pack-card" data-training-pack="${pack.id}">${icon(choice.symbol)}<strong>${choice.name}</strong><small>${choice.detail}</small><b>${score}</b></button>`;
     }).join("");
   }
   updateTrainingPack(view: {

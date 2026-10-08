@@ -1,6 +1,7 @@
 import * as T from "three";
 import { carModel, disposeModel } from "./models";
 import type { PartyMember } from "../../shared/party";
+import type { PlayerInput } from "../../shared/player";
 type Display = {
   model: T.Group;
   label: HTMLElement;
@@ -8,6 +9,10 @@ type Display = {
   target: T.Vector3;
   opacity: number;
   leaving: boolean;
+  jumpDown: boolean;
+  hop: number;
+  hopVelocity: number;
+  boostFlare: T.Mesh;
 };
 export class HomeLobby {
   group = new T.Group();
@@ -63,6 +68,8 @@ export class HomeLobby {
     dt: number,
     time: number,
     visible: boolean,
+    controls: PlayerInput,
+    controlledId: string,
   ) {
     this.group.visible = visible;
     this.area.hidden = !visible;
@@ -93,6 +100,7 @@ export class HomeLobby {
           m.preset.topper,
         );
         d.model.position.copy(position);
+        d.model.add(d.boostFlare);
         this.group.add(d.model);
         d.key = key;
       }
@@ -104,7 +112,14 @@ export class HomeLobby {
             m.preset.decal,
             m.preset.topper,
           ),
-          label = document.createElement("span");
+          label = document.createElement("span"),
+          boostFlare = new T.Mesh(
+            new T.SphereGeometry(0.12, 8, 6),
+            new T.MeshBasicMaterial({ color: 0x7cf9ff, transparent: true }),
+          );
+        boostFlare.position.set(0, 0.12, 0.95);
+        boostFlare.visible = false;
+        model.add(boostFlare);
         label.className = "lobby-name";
         this.labels.append(label);
         model.position.set(6, 0.31, 15);
@@ -116,6 +131,10 @@ export class HomeLobby {
           target: new T.Vector3(),
           opacity: 0,
           leaving: false,
+          jumpDown: false,
+          hop: 0,
+          hopVelocity: 0,
+          boostFlare,
         };
         this.displays.set(m.id, d);
       }
@@ -166,6 +185,25 @@ export class HomeLobby {
     camera.updateMatrixWorld(true);
     for (const [id, d] of this.displays) {
       d.model.position.lerp(d.target, ease);
+      if (id === controlledId) {
+        if (controls.jump && !d.jumpDown && d.hop < 0.04) d.hopVelocity = 4.8;
+        d.jumpDown = controls.jump;
+        d.hopVelocity -= 12 * dt;
+        d.hop = Math.max(0, d.hop + d.hopVelocity * dt);
+        if (d.hop === 0) d.hopVelocity = 0;
+        d.model.position.y = d.target.y + d.hop;
+        d.model.rotation.z = T.MathUtils.damp(
+          d.model.rotation.z,
+          controls.boost ? -0.035 : 0,
+          8,
+          dt,
+        );
+        d.boostFlare.visible = controls.boost;
+        d.boostFlare.scale.set(0.75, 0.75, 1.3 + Math.sin(time * 24) * 0.35);
+      } else {
+        d.model.position.y = d.target.y;
+        d.boostFlare.visible = false;
+      }
       d.opacity = T.MathUtils.lerp(d.opacity, d.leaving ? 0 : 1, ease);
       d.model.traverse((o) => {
         if (o instanceof T.Mesh)

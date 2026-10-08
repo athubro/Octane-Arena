@@ -85,6 +85,14 @@ const dribbleSpawn = simulation.cars[0].body.translation();
 const dribbleBall = simulation.ball.translation();
 assert.ok(Math.abs(dribbleBall.z - (dribbleSpawn.z - 2.5)) < 1e-5,
   "dribble ball starts in front of the car rather than across the void");
+car.body.setTranslation({ x: 0, y: 1, z: -125 }, true);
+simulation.step([]);
+assert.ok(car.body.translation().z < -120,
+  "the deepest dribble level remains inside the extended course bounds");
+car.body.setTranslation({ x: 0, y: -8, z: -132 }, true);
+simulation.step([]);
+assert.ok(car.body.translation().z > 45,
+  "falling beyond the dribble deck recovers to its starting platform");
 simulation.setRingCourse(false);
 
 console.log("PASS Ring Rush platform collision and spawn");

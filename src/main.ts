@@ -614,7 +614,11 @@ async function boot() {
     updatePreset();
     input.clear();
   });
-  ui.on("modes-back", () => ui.modes(false));
+  ui.on("modes-back", () => {
+    if (!document.querySelector<HTMLElement>(".extra-mode-grid")!.hidden)
+      ui.modeTab(false);
+    else ui.modes(false);
+  });
   ui.on("again", () => {
     if (match.mode !== "party") {
       if (trainingPackRun.completed && trainingPackRun.packId) {
@@ -1289,6 +1293,8 @@ async function boot() {
       dt,
       now / 1000,
       lobbyVisible && !partySetup,
+      controls,
+      party.playerId,
     );
     if (partySetup) {
       camera.clearViewOffset();

@@ -298,8 +298,7 @@ export class Car {
         }
       }
     }
-    const invertedSideSupport =
-      sideSupport && this.up.dot(sideSupport) < -0.3 && this.grounded;
+    const invertedSideSupport = sideSupport && this.up.dot(sideSupport) < -0.3;
     this.stuckTime = sideSupport ? this.stuckTime + dt : 0;
     if (
       sideSupport &&
