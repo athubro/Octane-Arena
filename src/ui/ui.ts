@@ -61,6 +61,9 @@ export class UI {
     dribble.innerHTML = `<span class="rings-mode-icon" aria-hidden="true">${icon("freeplay")}</span><strong>DRIBBLE CHALLENGE</strong>`;
     extra.replaceChildren(training, rings, dribble);
     document.querySelector<HTMLElement>(".mode-tabs")!.hidden = true;
+    document
+      .querySelectorAll<HTMLElement>(".training-pack-header > p")
+      .forEach((paragraph) => paragraph.remove());
   }
   private packModeMenu() {
     const standard = document.querySelector<HTMLElement>(".standard-mode-grid")!,
