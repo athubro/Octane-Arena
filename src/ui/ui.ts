@@ -43,7 +43,13 @@ export class UI {
   private configureModeCards() {
     const standard = document.querySelector<HTMLElement>(".standard-mode-grid")!,
       extra = document.querySelector<HTMLElement>(".extra-mode-grid")!,
-      friend = standard.querySelector<HTMLButtonElement>("button:disabled")!;
+      friend = standard.querySelector<HTMLButtonElement>("button:disabled")!,
+      secondaryModes = [
+        "heatseeker-mode",
+        "ranked-mode",
+        "dribbling-race-mode",
+        "bot-ranked-mode",
+      ].map((id) => document.getElementById(id)!);
     const extraCard = document.createElement("button");
     extraCard.id = "extra-modes-mode";
     extraCard.className = "mode-card";
@@ -60,6 +66,15 @@ export class UI {
       dribble = document.getElementById("solo-dribbling-mode")!;
     dribble.innerHTML = `<span class="rings-mode-icon" aria-hidden="true">${icon("freeplay")}</span><strong>DRIBBLE CHALLENGE</strong>`;
     extra.replaceChildren(training, rings, dribble);
+    const more = document.createElement("details"),
+      summary = document.createElement("summary"),
+      options = document.createElement("div");
+    more.className = "secondary-mode-list";
+    summary.textContent = "MORE MODES";
+    options.className = "secondary-mode-options";
+    options.append(...secondaryModes);
+    more.append(summary, options);
+    extra.after(more);
     document.querySelector<HTMLElement>(".mode-tabs")!.hidden = true;
     document
       .querySelectorAll<HTMLElement>(".training-pack-header > p")
@@ -96,6 +111,7 @@ export class UI {
     document.querySelector<HTMLElement>(".mode-tabs")!.hidden = true;
     document.querySelector<HTMLElement>("#modes > h2")!.textContent =
       extra ? "EXTRA MODES" : "PLAY";
+    document.querySelector<HTMLElement>(".secondary-mode-list")!.hidden = !extra;
   }
   fields(show: boolean) {
     this.screen = show ? "fields" : "modes";

@@ -1982,6 +1982,9 @@ output {
 #training-pack-select.full-screen {
   background: linear-gradient(105deg, #101d2df2 0%, #122731dc 62%, #0e3b37bd 100%);
 }
+#modes {
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+}
 .standard-mode-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   width: 100%;
@@ -1991,6 +1994,47 @@ output {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
   max-width: none;
+}
+.secondary-mode-list {
+  width: min(680px, 100%);
+  justify-self: center;
+  align-self: start;
+  color: #bed0d9;
+}
+.secondary-mode-list summary {
+  width: max-content;
+  padding: 5px 0;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: .12em;
+}
+.secondary-mode-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+}
+.secondary-mode-options .mode-card {
+  height: auto;
+  min-height: 40px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  clip-path: none;
+  border: 1px solid #476779;
+  font-size: 13px;
+}
+.secondary-mode-options .mode-card > svg,
+.secondary-mode-options .mode-card .heatseeker-mode-icon,
+.secondary-mode-options .mode-card .rings-mode-icon {
+  width: 21px;
+  height: 21px;
+  font-size: 19px;
+}
+.secondary-mode-options .mode-card strong {
+  font-size: 13px;
 }
 .mode-card {
   height: clamp(150px, 23vh, 230px);
