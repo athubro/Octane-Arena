@@ -89,7 +89,12 @@ export class UI {
     extra.hidden = true;
   }
   on(id: string, fn: () => void) {
-    document.getElementById(id)!.addEventListener("click", fn);
+    this.root.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const control = target.closest(`[id="${id}"]`);
+      if (control && this.root.contains(control)) fn();
+    });
   }
   modes(show: boolean) {
     this.screen = show ? "modes" : "home";
