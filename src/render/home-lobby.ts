@@ -12,6 +12,11 @@ type Display = {
   jumpDown: boolean;
   hop: number;
   hopVelocity: number;
+  jumpCooldown: number;
+  driveSpeed: number;
+  driveX: number;
+  driveZ: number;
+  heading: number;
   boostFlare: T.Mesh;
 };
 export class HomeLobby {
@@ -115,10 +120,15 @@ export class HomeLobby {
           ),
           label = document.createElement("span"),
           boostFlare = new T.Mesh(
-            new T.SphereGeometry(0.12, 8, 6),
-            new T.MeshBasicMaterial({ color: 0x7cf9ff, transparent: true }),
+            new T.ConeGeometry(0.13, 0.72, 8),
+            new T.MeshBasicMaterial({
+              color: 0x7cf9ff,
+              transparent: true,
+              opacity: 0.9,
+            }),
           );
-        boostFlare.position.set(0, 0.12, 0.95);
+        boostFlare.position.set(0, -0.02, 0.98);
+        boostFlare.rotation.x = Math.PI / 2;
         boostFlare.visible = false;
         model.add(boostFlare);
         label.className = "lobby-name";
@@ -135,6 +145,11 @@ export class HomeLobby {
           jumpDown: false,
           hop: 0,
           hopVelocity: 0,
+          jumpCooldown: 0,
+          driveSpeed: 0,
+          driveX: 0,
+          driveZ: 0,
+          heading: 0,
           boostFlare,
         };
         this.displays.set(m.id, d);
@@ -187,21 +202,60 @@ export class HomeLobby {
     for (const [id, d] of this.displays) {
       d.model.position.lerp(d.target, ease);
       if (id === controlledId) {
-        if (controls.jump && !d.jumpDown && d.hop < 0.04) d.hopVelocity = 4.8;
+        d.jumpCooldown = Math.max(0, d.jumpCooldown - dt);
+        if (controls.jump && !d.jumpDown && d.hop < 0.04 && d.jumpCooldown === 0) {
+          d.hopVelocity = 5.2;
+          d.jumpCooldown = 0.2;
+        }
+        if (controls.jump && d.hop < 0.015 && d.hopVelocity === 0 && d.jumpCooldown === 0) {
+          d.hopVelocity = 5.2;
+          d.jumpCooldown = 0.2;
+        }
         d.jumpDown = controls.jump;
         d.hopVelocity -= 12 * dt;
         d.hop = Math.max(0, d.hop + d.hopVelocity * dt);
         if (d.hop === 0) d.hopVelocity = 0;
-        d.model.position.y = d.target.y + d.hop;
+        const desiredSpeed = controls.throttle * (controls.boost ? 13 : 6.5);
+        d.driveSpeed = T.MathUtils.damp(
+          d.driveSpeed,
+          desiredSpeed,
+          controls.throttle ? 3.5 : 1.4,
+          dt,
+        );
+        d.heading += controls.steer * dt * (0.9 + Math.abs(d.driveSpeed) * 0.065);
+        d.driveX = T.MathUtils.clamp(
+          d.driveX + Math.sin(d.heading) * d.driveSpeed * dt,
+          -5.5,
+          5.5,
+        );
+        d.driveZ = T.MathUtils.clamp(
+          d.driveZ + Math.cos(d.heading) * d.driveSpeed * dt,
+          -5.2,
+          5.2,
+        );
+        if (Math.abs(d.driveSpeed) < 0.12 && !controls.throttle) {
+          d.driveX *= Math.exp(-dt * 0.6);
+          d.driveZ *= Math.exp(-dt * 0.6);
+        }
+        d.model.position.set(
+          d.target.x + d.driveX,
+          d.target.y + d.hop,
+          d.target.z + d.driveZ,
+        );
+        d.model.rotation.y = Math.PI + 0.38 + d.heading;
         d.model.rotation.z = T.MathUtils.damp(
           d.model.rotation.z,
-          controls.boost ? -0.035 : 0,
+          controls.boost ? -0.08 : 0,
           8,
           dt,
         );
         d.boostFlare.visible = controls.boost;
-        d.boostFlare.scale.set(0.75, 0.75, 1.3 + Math.sin(time * 24) * 0.35);
+        d.boostFlare.scale.set(0.8, 0.85, 0.8 + Math.sin(time * 24) * 0.25);
       } else {
+        d.driveX = 0;
+        d.driveZ = 0;
+        d.driveSpeed = 0;
+        d.heading = 0;
         d.model.position.y = d.target.y;
         d.boostFlare.visible = false;
       }

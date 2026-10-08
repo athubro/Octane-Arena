@@ -6,7 +6,9 @@ export class RingMap {
   private readonly ringRunway = new T.Group();
   private readonly dribbleDeck = new T.Group();
   private readonly dribbleGoal = new T.Group();
+  private readonly dribbleCheckpoints = new T.Group();
   private mode: "rings" | "dribble" = "rings";
+  private visible = false;
   private readonly background: T.Color | T.Texture | null;
   private readonly fog: T.Fog | T.FogExp2 | null;
 
@@ -21,6 +23,7 @@ export class RingMap {
       this.ringRunway,
       this.dribbleDeck,
       this.dribbleGoal,
+      this.dribbleCheckpoints,
     );
     scene.add(this.group);
     this.group.visible = false;
@@ -33,12 +36,19 @@ export class RingMap {
     this.ringRunway.visible = mode === "rings";
     this.dribbleDeck.visible = mode === "dribble";
     this.dribbleGoal.visible = mode === "dribble";
+    this.dribbleCheckpoints.visible = mode === "dribble";
+    this.setVisible(this.visible);
   }
 
   setVisible(visible: boolean) {
+    this.visible = visible;
     this.group.visible = visible;
-    this.scene.background = visible ? new T.Color(0x05090e) : this.background;
-    this.scene.fog = visible ? new T.Fog(0x07111a, 155, 420) : this.fog;
+    this.scene.background = visible
+      ? new T.Color(this.mode === "rings" ? 0x172533 : 0x05090e)
+      : this.background;
+    this.scene.fog = visible
+      ? new T.Fog(this.mode === "rings" ? 0x1b2c37 : 0x07111a, 155, 420)
+      : this.fog;
   }
 
   private addClouds() {
@@ -125,18 +135,21 @@ export class RingMap {
     deck.position.set(0, 0.015, -35);
     this.dribbleDeck.add(deck);
 
-    const laneStrip = new T.Mesh(
-      new T.BoxGeometry(2.4, 0.025, 190),
-      new T.MeshStandardMaterial({
-        color: 0x63d4ff,
-        emissive: 0x1787ad,
-        emissiveIntensity: 0.24,
-        transparent: true,
-        opacity: 0.72,
-      }),
-    );
-    laneStrip.position.set(0, 0.035, -35);
-    this.dribbleDeck.add(laneStrip);
+    const checkpointMaterial = new T.MeshStandardMaterial({
+      color: 0x8cf4d1,
+      emissive: 0x1aa77f,
+      emissiveIntensity: 1.15,
+      metalness: 0.2,
+      roughness: 0.36,
+    });
+    for (let i = 0; i < 6; i++) {
+      const checkpoint = new T.Mesh(
+        new T.TorusGeometry(1.05, 0.065, 8, 32),
+        checkpointMaterial.clone(),
+      );
+      checkpoint.name = `dribble-checkpoint-${i}`;
+      this.dribbleCheckpoints.add(checkpoint);
+    }
 
     const frameMaterial = new T.MeshStandardMaterial({
       color: 0xf0f5ff,
@@ -225,5 +238,18 @@ export class RingMap {
 
   setDribbleLevel(level: number, finish: { x: number; z: number }) {
     this.dribbleGoal.position.set(finish.x, 0, finish.z);
+    const segmentLength = 24 + level * 4.8;
+    this.dribbleCheckpoints.children.forEach((checkpoint, index) => {
+      const t = index / 5,
+        x = Math.sin((level + 1) * 0.9 + index * 1.3) * (2.8 + level * 0.32),
+        y = 1.4 + (index % 2) * 0.3 + Math.min(level, 10) * 0.035;
+      checkpoint.position.set(x, y, 12 - segmentLength * t);
+      checkpoint.rotation.set(0, 0, 0);
+      const scale = 1 + ((level + index) % 3) * 0.12;
+      checkpoint.scale.setScalar(scale);
+      const material = (checkpoint as T.Mesh).material as T.MeshStandardMaterial;
+      material.color.setHSL(0.42 + ((level + index) % 4) * 0.055, 0.7, 0.62);
+      material.emissive.setHSL(0.42 + ((level + index) % 4) * 0.055, 0.8, 0.3);
+    });
   }
 }

@@ -769,8 +769,15 @@ async function boot() {
   function frame(now: number) {
     const dt = Math.min((now - previous) / 1000, 0.1);
     previous = now;
+    const ringLikeMode = [
+      "rings",
+      "dribbling-race",
+      "solo-dribbling",
+      "bot-ranked",
+    ].includes(match.mode);
     ringCourse.setVisible(match.mode === "rings" && match.phase !== "home");
-    for (const pad of padMeshes) pad.visible = match.mode !== "rings";
+    ringMap.setVisible(ringLikeMode && match.phase !== "home");
+    for (const pad of padMeshes) pad.visible = !ringLikeMode;
     const controls = input.sample();
     const skipReplayPressed = input.take("KeyX");
     const networkGame = party.state?.game ?? null;

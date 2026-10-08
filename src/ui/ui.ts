@@ -70,6 +70,7 @@ export class UI {
       summary = document.createElement("summary"),
       options = document.createElement("div");
     more.className = "secondary-mode-list";
+    more.hidden = true;
     summary.textContent = "MORE MODES";
     options.className = "secondary-mode-options";
     options.append(...secondaryModes);
