@@ -508,10 +508,10 @@ function makeShot(difficulty: number, index: number): TrainingShot {
     requireRecoveryBeforeTouch,
     requireRecoveryAfterTouch,
     playerBoost,
-    carY,
-    carRoll,
+    carY: 0.36,
+    carRoll: 0,
     carVX,
-    carVY,
+    carVY: 0,
     carVZ,
   };
 }
