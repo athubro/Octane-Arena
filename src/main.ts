@@ -85,7 +85,7 @@ async function boot() {
     `BEAT YOUR BEST · ${ringChallenge.best} RINGS`;
   const renderer = new T.WebGLRenderer({
     antialias: false,
-    powerPreference: "high-performance",
+    powerPreference: "default",
   });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
   renderer.setSize(innerWidth, innerHeight);
@@ -1426,6 +1426,7 @@ async function boot() {
 }
 boot().catch((error) => {
   console.error(error);
+  const message = error instanceof Error ? error.message : String(error);
   document.querySelector("#app")!.innerHTML =
-    '<p class="loading">The arena could not start. Please use a browser with WebGL 2 enabled and reload.<br>See the browser console for details.</p>';
+    `<section class="loading"><h1>ARENA STARTUP FAILED</h1><p>${message.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!)}</p><p>Reload the page. If the error mentions WebGL, enable hardware acceleration and WebGL 2 in your browser.</p></section>`;
 });
