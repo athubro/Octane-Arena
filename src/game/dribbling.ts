@@ -46,8 +46,18 @@ export class DribblingChallenge {
       this.progress += 1;
     }
     if (this.progress >= this.checkpoints.length) {
-      this.completed = true;
-      return { complete: true, level: this.level + 1, total: this.levelCount };
+      const atFinish =
+        position.z <= this.finish.z &&
+        Math.abs(position.x - this.finish.x) <= 4.2 &&
+        position.y <= 4.2;
+      this.completed = atFinish;
+      return {
+        complete: atFinish,
+        level: this.level + 1,
+        total: this.levelCount,
+        progress: this.progress,
+        next: this.finish,
+      };
     }
     return {
       complete: false,

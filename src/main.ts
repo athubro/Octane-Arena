@@ -334,8 +334,16 @@ async function boot() {
       mode === "dribbling-race" ||
       mode === "solo-dribbling" ||
       mode === "bot-ranked";
+    const dribbleLikeMode =
+      mode === "dribbling-race" ||
+      mode === "solo-dribbling" ||
+      mode === "bot-ranked";
     ringMap.setMode(mode === "rings" ? "rings" : "dribble");
-    simulation.setRingCourse(ringLikeMode, RingChallenge.startingPosition);
+    simulation.setRingCourse(
+      ringLikeMode,
+      RingChallenge.startingPosition,
+      dribbleLikeMode,
+    );
     arena.setVisible(!ringLikeMode);
     ringMap.setVisible(ringLikeMode);
     resetEffects();
@@ -356,6 +364,10 @@ async function boot() {
       mode === "bot-ranked"
     ) {
       dribblingChallenge.start(0);
+      ringMap.setDribbleLevel(dribblingChallenge.level, {
+        x: dribblingChallenge.finish.x,
+        z: dribblingChallenge.finish.z,
+      });
       match.score = [1, dribblingChallenge.best];
     }
     ringCourse.syncActiveGate();
@@ -953,6 +965,10 @@ async function boot() {
                 match.freeze = 1.25;
                 match.message = `LEVEL ${cleared} CLEARED`;
                 dribblingChallenge.start(dribblingChallenge.level + 1);
+                ringMap.setDribbleLevel(dribblingChallenge.level, {
+                  x: dribblingChallenge.finish.x,
+                  z: dribblingChallenge.finish.z,
+                });
                 audio.tone(460 + cleared * 12, 0.2, 0.08, "sine");
               }
             }

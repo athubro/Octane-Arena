@@ -85,3 +85,28 @@ export function createRingPlatform(world: RAPIER.World) {
   return [deck, rail(-11.65, -20, 0.35, 78), rail(11.65, -20, 0.35, 78),
     rail(0, -97.65, 11.65, 0.35), rail(0, 57.65, 11.65, 0.35)];
 }
+
+export function createDribblePlatform(world: RAPIER.World) {
+  const centerZ = -35;
+  const halfLength = 95;
+  const deck = world.createCollider(
+    RAPIER.ColliderDesc.cuboid(12, 0.4, halfLength)
+      .setTranslation(0, -0.4, centerZ)
+      .setFriction(0.7)
+      .setRestitution(0.05),
+  );
+  const rail = (x: number, z: number, halfWidth: number, halfDepth: number) =>
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(halfWidth, 2, halfDepth)
+        .setTranslation(x, 2, z)
+        .setFriction(0.35)
+        .setRestitution(0.05),
+    );
+  return [
+    deck,
+    rail(-11.65, centerZ, 0.35, halfLength),
+    rail(11.65, centerZ, 0.35, halfLength),
+    rail(0, centerZ - halfLength, 12, 0.35),
+    rail(0, centerZ + halfLength, 12, 0.35),
+  ];
+}

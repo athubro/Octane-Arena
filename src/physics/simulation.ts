@@ -2,7 +2,11 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { Vector3, Quaternion } from "three";
 import { P } from "../config/physics";
 import { Car } from "../car/car";
-import { createArena, createRingPlatform } from "../arena/physics";
+import {
+  createArena,
+  createDribblePlatform,
+  createRingPlatform,
+} from "../arena/physics";
 import { Pose } from "./pose";
 import type { Controls } from "../input/types";
 import {
@@ -85,7 +89,9 @@ export class Simulation {
   world: RAPIER.World;
   private arenaColliders: RAPIER.Collider[];
   private ringPlatform: RAPIER.Collider[];
+  private dribblePlatform: RAPIER.Collider[];
   private ringCourseEnabled = false;
+  private dribbleCourseEnabled = false;
   private ringSpawn = { x: 0, y: 0.36, z: 51 };
   cars: Car[];
   ball: RAPIER.RigidBody;
@@ -138,7 +144,9 @@ export class Simulation {
     this.world.maxCcdSubsteps = 2;
     this.arenaColliders = createArena(this.world, flat);
     this.ringPlatform = createRingPlatform(this.world);
-    for (const collider of this.ringPlatform) collider.setCollisionGroups(0);
+    this.dribblePlatform = createDribblePlatform(this.world);
+    for (const collider of [...this.ringPlatform, ...this.dribblePlatform])
+      collider.setCollisionGroups(0);
     this.cars = players.map(() => new Car(this.world));
     this.velocities = players.map(() => new Vector3());
     this.relative = players.map(() => new Vector3());
@@ -174,12 +182,20 @@ export class Simulation {
     this.cars.forEach((c) => c.pose.snap());
     this.ballPose.snap();
   }
-  setRingCourse(enabled: boolean, spawn = { x: 0, y: 0.36, z: 51 }) {
+  setRingCourse(
+    enabled: boolean,
+    spawn = { x: 0, y: 0.36, z: 51 },
+    dribble = false,
+  ) {
     this.ringCourseEnabled = enabled;
+    this.dribbleCourseEnabled = enabled && dribble;
     this.ringSpawn = spawn;
     for (const collider of this.arenaColliders)
       collider.setCollisionGroups(enabled ? 0 : 0xffffffff);
-    for (const collider of this.ringPlatform) collider.setCollisionGroups(0);
+    for (const collider of this.ringPlatform)
+      collider.setCollisionGroups(enabled && !dribble ? 0xffffffff : 0);
+    for (const collider of this.dribblePlatform)
+      collider.setCollisionGroups(enabled && dribble ? 0xffffffff : 0);
   }
   setHeatseeker(enabled: boolean) {
     this.heatseekerEnabled = enabled;
@@ -219,7 +235,16 @@ export class Simulation {
           c.team === 0 ? 0 : Math.PI,
         );
     }
-    this.ball.setTranslation({ x: 0, y: P.ball.radius + 0.02, z: 0 }, true);
+    this.ball.setTranslation(
+      this.dribbleCourseEnabled
+        ? {
+            x: this.ringSpawn.x,
+            y: P.ball.radius + 0.02,
+            z: this.ringSpawn.z - 2.5,
+          }
+        : { x: 0, y: P.ball.radius + 0.02, z: 0 },
+      true,
+    );
     this.ball.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.ball.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.ballPose.snap();

@@ -70,4 +70,21 @@ assert.ok(
   "normal arena collisions return when Ring Rush ends",
 );
 
+simulation.setRingCourse(true, RingChallenge.startingPosition, true);
+for (const z of [51, 0, -30, -80, -125]) {
+  assert.ok(
+    simulation.world.castRay(
+      new RAPIER.Ray({ x: 0, y: 5, z }, { x: 0, y: -1, z: 0 }),
+      10,
+      true,
+    ),
+    `dribble deck supports the full level route at z=${z}`,
+  );
+}
+const dribbleSpawn = simulation.cars[0].body.translation();
+const dribbleBall = simulation.ball.translation();
+assert.ok(Math.abs(dribbleBall.z - (dribbleSpawn.z - 2.5)) < 1e-5,
+  "dribble ball starts in front of the car rather than across the void");
+simulation.setRingCourse(false);
+
 console.log("PASS Ring Rush platform collision and spawn");
