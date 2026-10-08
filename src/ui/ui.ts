@@ -311,6 +311,8 @@ export class UI {
   }
 
   updateDribblingChallenge(level: number, total: number, best: number) {
+    if (!document.getElementById("ring-score")!.classList.contains("dribble-score"))
+      return;
     document.getElementById("ring-streak")!.textContent = `${level} / ${total}`;
     document.getElementById("ring-best")!.textContent = `${best} COMPLETED`;
     document.getElementById("ring-next")!.hidden = true;

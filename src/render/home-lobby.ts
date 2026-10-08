@@ -90,6 +90,7 @@ export class HomeLobby {
       let d = this.displays.get(m.id);
       if (d && d.key !== key) {
         const position = d.model.position.clone();
+        d.model.remove(d.boostFlare);
         this.group.remove(d.model);
         disposeModel(d.model);
         d.model = carModel(
